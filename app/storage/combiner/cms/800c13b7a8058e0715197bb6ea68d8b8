@@ -1,0 +1,6 @@
+.head {
+  background: blue;
+}
+.head .heading {
+  color: red;
+}

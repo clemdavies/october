@@ -1,0 +1,12 @@
+.head {
+  background: blue;
+}
+.head .heading {
+  color: yellow;
+}
+.head {
+  background: blue;
+}
+.head .heading {
+  background-image: url("images/test.png");
+}
