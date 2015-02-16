@@ -7,7 +7,7 @@ use Backend\Models\UserGroup;
 class SeedSetupAdmin extends Seeder
 {
 
-    public static $email = 'admin@admin.com';
+    public static $email = 'admin@domain.tld';
     public static $login = 'admin';
     public static $password = 'admin';
     public static $firstName = 'Admin';
@@ -15,7 +15,9 @@ class SeedSetupAdmin extends Seeder
 
     public function setDefaults($values)
     {
-        if (!is_array($values)) return;
+        if (!is_array($values)) {
+            return;
+        }
         foreach ($values as $attribute => $value) {
             static::$$attribute = $value;
         }
@@ -24,7 +26,10 @@ class SeedSetupAdmin extends Seeder
     public function run()
     {
         $group = UserGroup::create([
-            'name' => 'Admins'
+            'name' => 'Admins',
+            'code' => 'admins',
+            'description' => 'Default group for administrators',
+            'is_new_user_default' => true
         ]);
 
         $user = User::create([

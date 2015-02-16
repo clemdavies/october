@@ -45,19 +45,25 @@ class CodeBase extends Extendable implements ArrayAccess
      * This event is triggered when all components are initialized and before AJAX is handled.
      * The layout's onInit method triggers before the page's onInit method.
      */
-    public function onInit() {}
+    public function onInit()
+    {
+    }
 
     /**
      * This event is triggered in the beginning of the execution cycle.
      * The layout's onStart method triggers before the page's onStart method.
      */
-    public function onStart() {}
+    public function onStart()
+    {
+    }
 
     /**
      * This event is triggered in the end of the execution cycle, but before the page is displayed.
      * The layout's onEnd method triggers after the page's onEnd method.
      */
-    public function onEnd() {}
+    public function onEnd()
+    {
+    }
 
     /**
      * ArrayAccess implementation
@@ -99,21 +105,32 @@ class CodeBase extends Extendable implements ArrayAccess
      */
     public function __call($method, $parameters)
     {
-        if (method_exists($this, $method))
+        if (method_exists($this, $method)) {
             return call_user_func_array([$this, $method], $parameters);
+        }
 
         return call_user_func_array([$this->controller, $method], $parameters);
     }
 
     /**
      * This object is referenced as $this->page in Cms\Classes\ComponentBase,
-     * so to avoid $this->page->page this method will proxy there.
+     * so to avoid $this->page->page this method will proxy there. This is also
+     * used as a helper for accessing controller variables/components easier
+     * in the page code, eg. $this->foo instead of $this['foo']
      * @param  string  $name
      * @return void
      */
     public function __get($name)
     {
-        return $this->page->{$name};
+        if (($value = $this->page->{$name}) !== null) {
+            return $value;
+        }
+
+        if (array_key_exists($name, $this->controller->vars)) {
+            return $this[$name];
+        }
+
+        return null;
     }
 
     /**

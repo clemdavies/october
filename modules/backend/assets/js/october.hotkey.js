@@ -1,9 +1,12 @@
 /*
- * Hot key binding. 
+ * Hot key binding.
+ * 
+ * Data attributes:
+ * - data-hotkey="ctrl+s, cmd+s" - enables the autocomplete plugin
  *
  * JavaScript API:
  *
- * $('html').hotKey({ hotkey: 'Ctrl+S', hotkeyMac: 'Command+M', callback: doSomething);
+ * $('html').hotKey({ hotkey: 'ctrl+s, cmd+s', callback: doSomething);
  */
 +function ($) { "use strict";
 
@@ -17,43 +20,20 @@
         if (!options.hotkey)
             throw new Error('No hotkey has been defined.');
 
-        if (!options.hotkeyMac)
-            options.hotkeyMac = options.hotkey
+        if (options.hotkeyMac) options.hotkey += ', ' + options.hotkeyMac // @todo deprecated
 
         var
-            keys,
-            keysCount,
-            platform = (navigator.userAgent.indexOf('Mac OS X') != -1) ? 'hotkeyMac' : 'hotkey',
-            keyBind = options[platform].toLowerCase(),
+            keys = options.hotkey.toLowerCase().split(','),
+            keysCount = keys.length,
+            keyConditions = [],
             keyPressed = { shift: false, ctrl: false, cmd: false, alt: false },
-            keyWaited = { shift: false, ctrl: false, cmd: false, alt: false, specific: -1 },
             keyMap = {'esc':27, 'tab':9, 'space':32, 'return':13, 'enter':13, 'backspace':8, 'scroll':145, 'capslock':20, 'numlock':144, 'pause':19,
                      'break':19, 'insert':45, 'home':36, 'delete':46, 'suppr':46, 'end':35, 'pageup':33, 'pagedown':34, 'left':37, 'up':38, 'right':39, 'down':40,
                      'f1':112, 'f2':113, 'f3':114, 'f4':115, 'f5':116, 'f6':117, 'f7':118, 'f8':119, 'f9':120, 'f10':121, 'f11':122, 'f12':123}
 
-        keys = keyBind.split('+')
-        keysCount = keys.length;
         for (var i = 0; i < keysCount; i++) {
-            switch (keys[i]) {
-                case 'shift':
-                    keyWaited.shift = true
-                    break
-                case 'ctrl':
-                    keyWaited.ctrl = true
-                    break
-                case 'command':
-                case 'cmd':
-                    keyWaited.cmd = true
-                    break
-                case 'alt':
-                    keyWaited.alt = true
-                    break
-            }
+            keyConditions.push(makeCondition(trim(keys[i])))
         }
-        keyWaited.specific = keyMap[keys[keys.length-1]]
-
-        if (typeof (keyWaited.specific) == 'undefined')
-            keyWaited.specific = keys[keys.length-1].toUpperCase().charCodeAt()
 
         $target.keydown(function (event) {
             keyPressed.shift = event.originalEvent.shiftKey
@@ -61,12 +41,7 @@
             keyPressed.cmd = event.originalEvent.metaKey
             keyPressed.alt = event.originalEvent.altKey
 
-            if (event.which == keyWaited.specific
-                && keyPressed.shift == keyWaited.shift
-                && keyPressed.ctrl == keyWaited.ctrl
-                && keyPressed.cmd == keyWaited.cmd
-                && keyPressed.alt == keyWaited.alt) {
-
+            if (testConditions(event)) {
                 if (options.hotkeyVisible && !$el.is(':visible'))
                     return
 
@@ -78,6 +53,7 @@
                 keyPressed.cmd = false
                 keyPressed.alt = false
             }
+
         });
 
         $target.keyup(function (event) {
@@ -86,11 +62,68 @@
             keyPressed.cmd = event.originalEvent.metaKey
             keyPressed.alt = event.originalEvent.altKey
         });
+
+        function testConditions(event) {
+            var count = keyConditions.length,
+                condition
+
+            for (var i = 0; i < count; i++) {
+                condition = keyConditions[i]
+
+                if (event.which == condition.specific
+                    && keyPressed.shift == condition.shift
+                    && keyPressed.ctrl == condition.ctrl
+                    && keyPressed.cmd == condition.cmd
+                    && keyPressed.alt == condition.alt) {
+                    return true
+                }
+            }
+
+            return false
+        }
+
+        function makeCondition(keyBind) {
+            var condition = { shift: false, ctrl: false, cmd: false, alt: false, specific: -1 },
+                keys = keyBind.split('+'),
+                count = keys.length
+
+            for (var i = 0; i < count; i++) {
+                switch (keys[i]) {
+                    case 'shift':
+                        condition.shift = true
+                        break
+                    case 'ctrl':
+                        condition.ctrl = true
+                        break
+                    case 'command':
+                    case 'cmd':
+                    case 'meta':
+                        condition.cmd = true
+                        break
+                    case 'alt':
+                        condition.alt = true
+                        break
+                }
+            }
+
+            condition.specific = keyMap[keys[keys.length-1]]
+
+            if (typeof (condition.specific) == 'undefined')
+                condition.specific = keys[keys.length-1].toUpperCase().charCodeAt()
+
+            return condition
+        }
+
+        function trim(str){
+            return str
+                .replace(/^\s+/, "") // Left
+                .replace(/\s+$/, "") // Right
+        }
     }
 
     HotKey.DEFAULTS = {
         hotkey: null,
-        hotkeyMac: null,
+        hotkeyMac: null, // @todo deprecated
         hotkeyTarget: 'html',
         hotkeyVisible: true,
         callback: function(element) {

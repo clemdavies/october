@@ -34,7 +34,7 @@ return [
         'menu_label' => 'Seiten',
         'no_list_records' => 'Keine Seiten gefunden',
         'new' => 'Neue Seite',
-        'invalid_url' => 'Ungültiges URL-Format. Die URL muss mit einem Slash beginnen und darf nur Ziffern, lateinische Zeichen und die folgenden Symbole beinhalten: _-[]:?|/+*',
+        'invalid_url' => 'Ungültiges URL-Format. Die URL muss mit einem Slash beginnen und darf nur Ziffern, lateinische Zeichen und die folgenden Symbole beinhalten: ._-[]:?|/+*^$',
         'delete_confirm_multiple' => 'Wollen Sie die ausgewählten Seiten wirklich löschen?',
         'delete_confirm_single' => 'Wollen Sie diese Seite wirklich löschen?',
         'no_layout' => '-- Kein Layout --'
@@ -67,9 +67,6 @@ return [
     'ajax_handler' => [
         'invalid_name' => "Ungültiger Name für AJAX Handler: :name.",
         'not_found' => "AJAX Handler ':name' wurde nicht gefunden.",
-    ],
-    'combiner' => [
-        'not_found' => "Die combiner Datei ':name' wurde nicht gefunden.",
     ],
     'cms' => [
         'menu_label' => "CMS"

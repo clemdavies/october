@@ -57,7 +57,9 @@
         /*
          * Detect invalid fields, uncollapse the panel
          */
-        $(window).on('ajaxInvalidField', function(ev, element, name){
+        $(window).on('ajaxInvalidField', function(ev, element, name, messages, isFirst){
+            if (!isFirst) return
+            event.preventDefault()
 
             var $panel = element.closest('.form-tabless-fields.collapsed'),
                 $primaryPanel = element.closest('.control-tabs.primary.collapsed')
@@ -78,13 +80,20 @@
         })
 
         /*
-         * Listen for the closed event
+         * Listen for the closing events
          */
         $('#cms-master-tabs').on('closed.oc.tab', function(event){
             updateModifiedCounter()
 
             if ($('> div.tab-content > div.tab-pane', '#cms-master-tabs').length == 0)
                 setPageTitle('')
+        })
+
+        $('#cms-master-tabs').on('beforeClose.oc.tab', function(event){
+            // Dispose data table widgets
+
+            if ($.fn.table !== undefined)
+                $('[data-control=table]', event.relatedTarget).table('dispose')
         })
 
         /*
@@ -143,6 +152,9 @@
             var $primaryCollapseIcon = $('<a href="javascript:;" class="tab-collapse-icon primary"><i class="icon-chevron-down"></i></a>')
             var $primaryPanel = $('.control-tabs.primary', data.pane)
             var $secondaryPanel = $('.control-tabs.secondary', data.pane)
+            var $primaryTabContainer = $('.nav-tabs', $primaryPanel)
+
+            $primaryTabContainer.addClass('master-area')
 
             if ($primaryPanel.length > 0) {
                 $secondaryPanel.append($primaryCollapseIcon);
@@ -189,6 +201,8 @@
                 $panel.trigger('unmodified.oc.tab')
                 updateModifiedCounter()
             })
+
+            addTokenExpanderToEditor(data.pane, $form)
         })
 
         /*
@@ -361,8 +375,13 @@
         })
 
         function updateComponentListClass(pane) {
-            var $componentList = $('.control-componentlist', pane)
-            $componentList.toggleClass('has-components', $('.layout', $componentList).children().length > 0)
+            var $componentList = $('.control-componentlist', pane),
+                $primaryPanel = $('.control-tabs.primary', pane),
+                $primaryTabContainer = $('.nav-tabs', $primaryPanel),
+                hasComponents = $('.layout', $componentList).children(':not(.hidden)').length > 0
+
+            $primaryTabContainer.toggleClass('component-area', hasComponents)
+            $componentList.toggleClass('has-components', hasComponents)
         }
 
         function updateFormEditorMode(pane, initialization) {
@@ -377,16 +396,7 @@
                 parts = fileName.split('.'),
                 extension = 'txt',
                 mode = 'plain_text',
-                modes = {
-                    'htm': 'html',
-                    'md': 'markdown',
-                    'txt': 'plain_text',
-                    'js': 'javascript',
-                    'less': 'less',
-                    'scss': 'scss',
-                    'sass': 'sass',
-                    'css': 'css'
-                },
+                modes = $.oc.codeEditorExtensionModes,
                 editor = $('[data-control=codeeditor]', pane)
 
             if (parts.length >= 2)
@@ -426,19 +436,68 @@
             })
         }
 
+        function addTokenExpanderToEditor(pane, $form) {
+            var group = $('[data-field-name=markup]', pane),
+                editor = $('[data-control=codeeditor]', group),
+                canExpand = false
+
+            if (!editor.length || editor.data('oc.tokenexpander'))
+                return
+
+            var toolbar = editor.codeEditor('getToolbar')
+
+            editor.tokenExpander()
+
+            var breakButton = $('<li />').prop({ 'class': 'tokenexpander-button' }).append(
+                $('<a />').prop({ 'href': 'javascript:; '}).append(
+                    $('<i />').prop({ 'class': 'icon-code-fork' })
+                )
+            )
+
+            breakButton.hide().on('click', function(){
+                handleExpandToken(editor, $form)
+                return false
+            })
+
+            $('ul:first', toolbar).prepend(breakButton)
+
+            editor
+                .on('show.oc.tokenexpander', function(){
+                    canExpand = true
+                    breakButton.show()
+                })
+                .on('hide.oc.tokenexpander', function(){
+                    canExpand = false
+                    breakButton.hide()
+                })
+                .on('dblclick', function(e){
+                    if ((e.metaKey || e.ctrlKey) && canExpand) {
+                        handleExpandToken(editor, $form)
+                    }
+                })
+        }
+
+        function handleExpandToken(editor, $form) {
+            editor.tokenExpander('expandToken', function(token, value){
+                return $form.request('onExpandMarkupToken', {
+                    data: { tokenType: token, tokenName: value }
+                })
+            })
+        }
+
         function handleMtimeMismatch(form) {
             var $form = $(form)
             $form.popup({ handler: 'onOpenConcurrencyResolveForm' })
 
             var popup = $form.data('oc.popup')
 
-            $(popup.$target).on('click', 'button[data-action=reload]', function(){
+            $(popup.$content).on('click', 'button[data-action=reload]', function(){
                 popup.hide()
 
                 reloadForm(form)
             })
 
-            $(popup.$target).on('click', 'button[data-action=save]', function(){
+            $(popup.$content).on('click', 'button[data-action=save]', function(){
                 popup.hide()
 
                 $('input[name=templateForceSave]', $form).val(1)
@@ -528,7 +587,7 @@
 
             var $componentList = $('#cms-master-tabs > div.tab-content > .tab-pane.active .control-componentlist .layout')
             if ($componentList.length == 0) {
-                alert('Components can be added only to pages and layouts.')
+                alert('Components can be added only to pages, partials and layouts.')
                 return;
             }
 

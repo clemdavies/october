@@ -1,9 +1,11 @@
 <?php namespace Backend\FormWidgets;
 
+use Lang;
 use Backend\Classes\FormWidgetBase;
+use System\Classes\SystemException;
 
 /**
- * Date picker
+ * Record Finder
  * Renders a record finder field.
  *
  *    user:
@@ -11,8 +13,8 @@ use Backend\Classes\FormWidgetBase;
  *        type: recordfinder
  *        list: @/plugins/rainlab/user/models/user/columns.yaml
  *        prompt: Click the Find button to find a user
- *        nameColumn: name
- *        descriptionColumn: email
+ *        nameFrom: name
+ *        descriptionFrom: email
  * 
  * @package october\backend
  * @author Alexey Bobkov, Samuel Georges
@@ -42,17 +44,17 @@ class RecordFinder extends FormWidgetBase
     /**
      * @var string Field name to use for key.
      */
-    public $keyField = 'id';
+    public $keyFrom = 'id';
 
     /**
      * @var string Relation column to display for the name
      */
-    public $nameColumn;
+    public $nameFrom;
 
     /**
      * @var string Relation column to display for the description
      */
-    public $descriptionColumn;
+    public $descriptionFrom;
 
     /**
      * @var string Prompt to display if no record is selected.
@@ -74,16 +76,29 @@ class RecordFinder extends FormWidgetBase
      */
     public function init()
     {
-        $this->relationName = $this->formField->columnName;
+        $this->relationName = $this->formField->valueFrom;
         $this->relationType = $this->model->getRelationType($this->relationName);
 
         $this->prompt = $this->getConfig('prompt', 'Click the %s button to find a record');
-        $this->keyField = $this->getConfig('keyField', $this->keyField);
-        $this->nameColumn = $this->getConfig('nameColumn', $this->nameColumn);
-        $this->descriptionColumn = $this->getConfig('descriptionColumn', $this->descriptionColumn);
+        $this->keyFrom = $this->getConfig('keyFrom', $this->keyFrom);
+        $this->nameFrom = $this->getConfig('nameFrom', $this->nameFrom);
+        $this->descriptionFrom = $this->getConfig('descriptionFrom', $this->descriptionFrom);
 
-        if (!$this->model->hasRelation($this->relationName))
-            throw new SystemException(Lang::get('backend::lang.model.missing_relation', ['class'=>get_class($this->controller), 'relation'=>$this->relationName]));
+        /* @todo Remove lines if year >= 2015 */
+        if ($this->getConfig('nameColumn')) {
+            $this->nameFrom = $this->getConfig('nameColumn');
+        }
+        /* @todo Remove lines if year >= 2015 */
+        if ($this->getConfig('descriptionColumn')) {
+            $this->descriptionFrom = $this->getConfig('descriptionColumn');
+        }
+
+        if (!$this->model->hasRelation($this->relationName)) {
+            throw new SystemException(Lang::get('backend::lang.model.missing_relation', [
+                'class' => get_class($this->model),
+                'relation' => $this->relationName
+            ]));
+        }
 
         if (post('recordfinder_flag')) {
             $this->listWidget = $this->makeListWidget();
@@ -95,7 +110,7 @@ class RecordFinder extends FormWidgetBase
             /*
              * Link the Search Widget to the List Widget
              */
-            $this->searchWidget->bindEvent('search.submit', function() {
+            $this->searchWidget->bindEvent('search.submit', function () {
                 $this->listWidget->setSearchTerm($this->searchWidget->getActiveTerm());
                 return $this->listWidget->onRefresh();
             });
@@ -115,7 +130,9 @@ class RecordFinder extends FormWidgetBase
 
     public function onRefresh()
     {
-        $this->model->{$this->columnName} = post($this->formField->getName());
+        list($model, $attribute) = $this->resolveModelAttribute($this->valueFrom);
+        $model->{$attribute} = post($this->formField->getName());
+
         $this->prepareVars();
         return ['#'.$this->getId('container') => $this->makePartial('recordfinder')];
     }
@@ -125,7 +142,8 @@ class RecordFinder extends FormWidgetBase
      */
     public function prepareVars()
     {
-        $this->relationModel = $this->model->{$this->columnName};
+        $this->relationModel = $this->getLoadValue();
+
         $this->vars['value'] = $this->getKeyValue();
         $this->vars['field'] = $this->formField;
         $this->vars['nameValue'] = $this->getNameValue();
@@ -146,33 +164,50 @@ class RecordFinder extends FormWidgetBase
     /**
      * {@inheritDoc}
      */
-    public function getSaveData($value)
+    public function getSaveValue($value)
     {
         return strlen($value) ? $value : null;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public function getLoadValue()
+    {
+        list($model, $attribute) = $this->resolveModelAttribute($this->valueFrom);
+
+        if (!is_null($model)) {
+            return $model->{$attribute};
+        }
+
+        return null;
+    }
+
     public function getKeyValue()
     {
-        if (!$this->relationModel)
+        if (!$this->relationModel) {
             return null;
+        }
 
-        return $this->relationModel->{$this->keyField};
+        return $this->relationModel->{$this->keyFrom};
     }
 
     public function getNameValue()
     {
-        if (!$this->relationModel || !$this->nameColumn)
+        if (!$this->relationModel || !$this->nameFrom) {
             return null;
+        }
 
-        return $this->relationModel->{$this->nameColumn};
+        return $this->relationModel->{$this->nameFrom};
     }
 
     public function getDescriptionValue()
     {
-        if (!$this->relationModel || !$this->descriptionColumn)
+        if (!$this->relationModel || !$this->descriptionFrom) {
             return null;
+        }
 
-        return $this->relationModel->{$this->descriptionColumn};
+        return $this->relationModel->{$this->descriptionFrom};
     }
 
     public function onFindRecord()
@@ -212,7 +247,7 @@ class RecordFinder extends FormWidgetBase
         $config = $this->makeConfig();
         $config->alias = $this->alias . 'Search';
         $config->growable = false;
-        $config->useSession = false;
+        $config->prompt = 'backend::lang.list.search_prompt';
         $widget = $this->makeWidget('Backend\Widgets\Search', $config);
         $widget->cssClasses[] = 'recordfinder-search';
         return $widget;

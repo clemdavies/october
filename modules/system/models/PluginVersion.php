@@ -1,9 +1,16 @@
 <?php namespace System\Models;
 
+use Lang;
 use Model;
 use Config;
 use System\Classes\PluginManager;
 
+/**
+ * Stores information about current plugin versions.
+ *
+ * @package october\system
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class PluginVersion extends Model
 {
     use \October\Rain\Database\Traits\Purgeable;
@@ -18,7 +25,7 @@ class PluginVersion extends Model
     /**
      * @var array List of attribute names which should not be saved to the database.
      */
-    protected $purgeable = ['name', 'description', 'orphaned', 'author', 'icon'];
+    protected $purgeable = ['name', 'description', 'orphaned', 'author', 'icon', 'homepage'];
 
     public $timestamps = false;
 
@@ -46,13 +53,15 @@ class PluginVersion extends Model
         if ($pluginObj) {
             $pluginInfo = $pluginObj->pluginDetails();
             foreach ($pluginInfo as $attribute => $info) {
-                $this->{$attribute} = $info;
+                $this->{$attribute} = Lang::get($info);
             }
 
-            if ($this->is_disabled)
+            if ($this->is_disabled) {
                 $manager->disablePlugin($this->code, true);
-            else
+            }
+            else {
                 $manager->enablePlugin($this->code, true);
+            }
 
             $this->disabledBySystem = $pluginObj->disabled;
 
@@ -62,7 +71,7 @@ class PluginVersion extends Model
         }
         else {
             $this->name = $this->code;
-            $this->description = 'Plugin has been removed from the file system.';
+            $this->description = Lang::get('system::lang.plugins.unknown_plugin');
             $this->orphaned = true;
         }
 
@@ -83,5 +92,4 @@ class PluginVersion extends Model
             ? self::$versionCache[$pluginCode]
             : null;
     }
-
 }

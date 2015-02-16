@@ -64,6 +64,11 @@ class UpdateManager
     protected $secret;
 
     /**
+     * @var boolean If set to true, core updates will not be downloaded or extracted.
+     */
+    protected $disableCoreUpdates = false;
+
+    /**
      * Initialize this singleton.
      */
     protected function init()
@@ -74,12 +79,14 @@ class UpdateManager
         $this->repository = App::make('migration.repository');
         $this->tempDirectory = Config::get('cms.tempDir', sys_get_temp_dir());
         $this->baseDirectory = PATH_BASE;
+        $this->disableCoreUpdates = Config::get('cms.disableCoreUpdates', false);
 
         /*
          * Ensure temp directory exists
          */
-        if (!File::isDirectory($this->tempDirectory))
+        if (!File::isDirectory($this->tempDirectory)) {
             File::makeDirectory($this->tempDirectory, 0777, true);
+        }
     }
 
     /**
@@ -98,15 +105,16 @@ class UpdateManager
          * Update modules
          */
         $modules = Config::get('cms.loadModules', []);
-        foreach ($modules as $module)
+        foreach ($modules as $module) {
             $this->migrateModule($module);
+        }
 
         /*
          * Update plugins
          */
-        $plugins = $this->pluginManager->getPlugins();
-        foreach ($plugins as $name => $plugin) {
-            $this->updatePlugin($name);
+        $plugins = $this->pluginManager->sortByDependencies();
+        foreach ($plugins as $plugin) {
+            $this->updatePlugin($plugin);
         }
 
         Parameters::set('system::update.count', 0);
@@ -117,8 +125,9 @@ class UpdateManager
          */
         if ($firstUp) {
             $modules = Config::get('cms.loadModules', []);
-            foreach ($modules as $module)
+            foreach ($modules as $module) {
                 $this->seedModule($module);
+            }
         }
 
         return $this;
@@ -136,15 +145,17 @@ class UpdateManager
          * Already know about updates, never retry.
          */
         $oldCount = Parameters::get('system::update.count');
-        if ($oldCount > 0)
+        if ($oldCount > 0) {
             return $oldCount;
+        }
 
         /*
          * Retry period not passed, skipping.
          */
         if (!$force && ($retryTimestamp = Parameters::get('system::update.retry'))) {
-            if (Carbon::createFromTimeStamp($retryTimestamp)->isFuture())
+            if (Carbon::createFromTimeStamp($retryTimestamp)->isFuture()) {
                 return $oldCount;
+            }
         }
 
         try {
@@ -186,6 +197,7 @@ class UpdateManager
         }
 
         $result = $this->requestServerData('core/update', $params);
+        $updateCount = (int) array_get($result, 'update', 0);
 
         /*
          * Inject known core build
@@ -206,7 +218,33 @@ class UpdateManager
         }
         $result['plugins'] = $plugins;
 
-        Parameters::set('system::update.count', array_get($result, 'update', 0));
+        /*
+         * Strip out themes that have been installed before
+         */
+        $themes = [];
+        foreach (array_get($result, 'themes', []) as $code => $info) {
+            if (!$this->isThemeInstalled($code)) {
+                $themes[$code] = $info;
+            }
+        }
+        $result['themes'] = $themes;
+
+        /*
+         * If there is a core update and core updates are disabled,
+         * remove the entry and discount an update unit.
+         */
+        if (array_get($result, 'core') && $this->disableCoreUpdates) {
+            $updateCount = max(0, --$updateCount);
+            unset($result['core']);
+        }
+
+        /*
+         * Recalculate the update counter
+         */
+        $updateCount += count($themes);
+        $result['hasUpdates'] = $updateCount > 0;
+        $result['update'] = $updateCount;
+        Parameters::set('system::update.count', $updateCount);
 
         return $result;
     }
@@ -255,7 +293,9 @@ class UpdateManager
                 $this->note($note);
             }
 
-            if ($count == 0) break;
+            if ($count == 0) {
+                break;
+            }
         }
 
         Schema::dropIfExists('migrations');
@@ -300,8 +340,9 @@ class UpdateManager
     public function seedModule($module)
     {
         $className = '\\'.$module.'\Database\Seeds\DatabaseSeeder';
-        if (!class_exists($className))
+        if (!class_exists($className)) {
             return;
+        }
 
         $seeder = App::make($className);
         $seeder->run();
@@ -330,8 +371,9 @@ class UpdateManager
     {
         $filePath = $this->getFilePath('core');
 
-        if (!Zip::extract($filePath, $this->baseDirectory))
+        if (!Zip::extract($filePath, $this->baseDirectory)) {
             throw new ApplicationException(Lang::get('system::lang.zip.extract_failed', ['file' => $filePath]));
+        }
 
         @unlink($filePath);
 
@@ -427,10 +469,64 @@ class UpdateManager
         $fileCode = $name . $hash;
         $filePath = $this->getFilePath($fileCode);
 
-        if (!Zip::extract($filePath, $this->baseDirectory . '/plugins/'))
+        if (!Zip::extract($filePath, $this->baseDirectory . '/plugins/')) {
             throw new ApplicationException(Lang::get('system::lang.zip.extract_failed', ['file' => $filePath]));
+        }
 
         @unlink($filePath);
+    }
+
+    //
+    // Themes
+    //
+
+    /**
+     * Downloads a theme from the update server.
+     * @param string $name Theme name.
+     * @param string $hash Expected file hash.
+     * @return self
+     */
+    public function downloadTheme($name, $hash)
+    {
+        $fileCode = $name . $hash;
+        $this->requestServerFile('theme/get', $fileCode, $hash, ['name' => $name]);
+    }
+
+    /**
+     * Extracts a theme after it has been downloaded.
+     */
+    public function extractTheme($name, $hash)
+    {
+        $fileCode = $name . $hash;
+        $filePath = $this->getFilePath($fileCode);
+
+        if (!Zip::extract($filePath, $this->baseDirectory . '/themes/')) {
+            throw new ApplicationException(Lang::get('system::lang.zip.extract_failed', ['file' => $filePath]));
+        }
+
+        $this->setThemeInstalled($name);
+        @unlink($filePath);
+    }
+
+    /**
+     * Checks if a theme has ever been installed before.
+     * @param  string  $name Theme code
+     * @return boolean
+     */
+    public function isThemeInstalled($name)
+    {
+        return array_key_exists($name, Parameters::get('system::theme.history', []));
+    }
+
+    /**
+     * Flags a theme as being installed, so it is not downloaded twice.
+     * @param string $name Theme code
+     */
+    public function setThemeInstalled($name)
+    {
+        $history = Parameters::get('system::theme.history', []);
+        $history[$name] = Carbon::now()->timestamp;
+        Parameters::set('system::theme.history', $history);
     }
 
     //
@@ -479,12 +575,13 @@ class UpdateManager
      */
     public function requestServerData($uri, $postData = [])
     {
-        $result = Http::post($this->createServerUrl($uri), function($http) use ($postData) {
+        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData) {
             $this->applyHttpAttributes($http, $postData);
         });
 
-        if ($result->code == 404)
+        if ($result->code == 404) {
             throw new ApplicationException(Lang::get('system::lang.server.response_not_found'));
+        }
 
         if ($result->code != 200) {
             throw new ApplicationException(
@@ -503,8 +600,9 @@ class UpdateManager
             throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
         }
 
-        if ($resultData === false || (is_string($resultData) && !strlen($resultData)))
+        if ($resultData === false || (is_string($resultData) && !strlen($resultData))) {
             throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
 
         return $resultData;
     }
@@ -525,13 +623,14 @@ class UpdateManager
             $postData['project'] = $projectId;
         }
 
-        $result = Http::post($this->createServerUrl($uri), function($http) use ($postData, $filePath) {
+        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData, $filePath) {
             $this->applyHttpAttributes($http, $postData);
             $http->toFile($filePath);
         });
 
-        if ($result->code != 200)
+        if ($result->code != 200) {
             throw new ApplicationException(File::get($filePath));
+        }
 
         if (md5_file($filePath) != $expectedHash) {
             @unlink($filePath);
@@ -544,7 +643,7 @@ class UpdateManager
      * @param  string $fileCode A unique file code
      * @return string           Full path on the disk
      */
-    private function getFilePath($fileCode)
+    protected function getFilePath($fileCode)
     {
         $name = md5($fileCode) . '.arc';
         return $this->tempDirectory . '/' . $name;
@@ -566,11 +665,12 @@ class UpdateManager
      * @param  string $uri URI
      * @return string      URL
      */
-    private function createServerUrl($uri)
+    protected function createServerUrl($uri)
     {
         $gateway = Config::get('cms.updateServer', 'http://octobercms.com/api');
-        if (substr($gateway, -1) != '/')
+        if (substr($gateway, -1) != '/') {
             $gateway .= '/';
+        }
 
         return $gateway . $uri;
     }
@@ -581,9 +681,12 @@ class UpdateManager
      * @param  array $postData Post data
      * @return void
      */
-    private function applyHttpAttributes($http, $postData)
+    protected function applyHttpAttributes($http, $postData)
     {
         $postData['url'] = base64_encode(URL::to('/'));
+        if (Config::get('cms.edgeUpdates', false)) {
+            $postData['edge'] = 1;
+        }
 
         if ($this->key && $this->secret) {
             $postData['nonce'] = $this->createNonce();
@@ -591,8 +694,9 @@ class UpdateManager
             $http->header('Rest-Sign', $this->createSignature($postData, $this->secret));
         }
 
-        if ($credentials = Config::get('cms.updateAuth'))
+        if ($credentials = Config::get('cms.updateAuth')) {
             $http->auth($credentials);
+        }
 
         $http->noRedirect();
         $http->data($postData);
@@ -602,7 +706,7 @@ class UpdateManager
      * Create a nonce based on millisecond time
      * @return int
      */
-    private function createNonce()
+    protected function createNonce()
     {
         $mt = explode(' ', microtime());
         return $mt[1] . substr($mt[0], 2, 6);
@@ -612,9 +716,8 @@ class UpdateManager
      * Create a unique signature for transmission.
      * @return string
      */
-    private function createSignature($data, $secret)
+    protected function createSignature($data, $secret)
     {
         return base64_encode(hash_hmac('sha512', http_build_query($data, '', '&'), base64_decode($secret), true));
     }
-
 }

@@ -53,22 +53,26 @@ class Search extends WidgetBase
         /*
          * Process configuration
          */
-        if (isset($this->config->prompt))
+        if (isset($this->config->prompt)) {
             $this->placeholder = trans($this->config->prompt);
+        }
 
-        if (isset($this->config->partial))
+        if (isset($this->config->partial)) {
             $this->customPartial = $this->config->partial;
+        }
 
-        if (isset($this->config->growable))
+        if (isset($this->config->growable)) {
             $this->growable = $this->config->growable;
+        }
 
         /*
          * Add CSS class styles
          */
         $this->cssClasses[] = 'icon search';
 
-        if ($this->growable)
+        if ($this->growable) {
             $this->cssClasses[] = 'growable';
+        }
     }
 
     /**
@@ -78,10 +82,12 @@ class Search extends WidgetBase
     {
         $this->prepareVars();
 
-        if ($this->customPartial)
+        if ($this->customPartial) {
             return $this->controller->makePartial($this->customPartial);
-        else
+        }
+        else {
             return $this->makePartial('search');
+        }
     }
 
     /**
@@ -102,14 +108,16 @@ class Search extends WidgetBase
         /*
          * Save or reset search term in session
          */
-        $this->setActiveTerm(post('term'));
+        $this->setActiveTerm(post($this->getName()));
 
         /*
          * Trigger class event, merge results as viewable array
          */
         $params = func_get_args();
         $result = $this->fireEvent('search.submit', [$params]);
-        return Util::arrayMerge($result);
+        if ($result && is_array($result)) {
+            return Util::arrayMerge($result);
+        }
     }
 
     /**
@@ -125,11 +133,22 @@ class Search extends WidgetBase
      */
     public function setActiveTerm($term)
     {
-        if (strlen($term))
+        if (strlen($term)) {
             $this->putSession('term', $term);
-        else
+        }
+        else {
             $this->resetSession();
+        }
 
         $this->activeTerm = $term;
+    }
+
+    /**
+     * Returns a value suitable for the field name property.
+     * @return string
+     */
+    public function getName()
+    {
+        return $this->alias . '[term]';
     }
 }

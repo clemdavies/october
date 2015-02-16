@@ -7,17 +7,18 @@
 
 <?php if (!$this->fatalError): ?>
 
-    <?= Form::open(['class'=>'layout-item stretch layout-column']) ?>
+    <?= Form::open(['class'=>'layout']) ?>
 
-        <?= $this->formRender() ?>
+        <div class="layout-row">
+            <?= $this->formRender() ?>
+        </div>
 
-        <div class="form-buttons layout-item fix">
+        <div class="form-buttons">
             <div class="loading-indicator-container">
                 <button
                     type="submit"
                     data-request="onSave"
-                    data-hotkey="ctrl+s"
-                    data-hotkey-mac="cmd+s"
+                    data-hotkey="ctrl+s, cmd+s"
                     data-load-indicator="Creating {{singular_name}}..."
                     class="btn btn-primary">
                     Create
@@ -26,8 +27,7 @@
                     type="button"
                     data-request="onSave"
                     data-request-data="close:1"
-                    data-hotkey="ctrl+enter"
-                    data-hotkey-mac="cmd+enter"
+                    data-hotkey="ctrl+enter, cmd+enter"
                     data-load-indicator="Creating {{singular_name}}..."
                     class="btn btn-default">
                     Create and Close

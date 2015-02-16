@@ -2,6 +2,7 @@
 
 use File as FileHelper;
 use October\Rain\Database\Model;
+use October\Rain\Database\Attach\FileException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\File\File as FileObj;
 
@@ -51,11 +52,11 @@ class File extends Model
     protected $autoMimeTypes = [
         'docx' => 'application/msword',
         'xlsx' => 'application/excel',
-        'gif' => 'image/gif',
-        'png' => 'image/png',
-        'jpg' => 'image/jpeg',
+        'gif'  => 'image/gif',
+        'png'  => 'image/png',
+        'jpg'  => 'image/jpeg',
         'jpeg' => 'image/jpeg',
-        'pdf' => 'application/pdf'
+        'pdf'  => 'application/pdf'
     ];
 
     /**
@@ -264,7 +265,7 @@ class File extends Model
      */
     public function isImage()
     {
-        return in_array($this->getExtension(), static::$imageExtensions);
+        return in_array(strtolower($this->getExtension()), static::$imageExtensions);
     }
 
     /**
@@ -272,17 +273,21 @@ class File extends Model
      */
     public function getThumb($width, $height, $options = [])
     {
+        // @todo See: https://github.com/octobercms/october/issues/181
+        // if (!$this->hasFile($this->getDiskPath()))
+        //     return '';
+
         if (!$this->isImage())
             return $this->getPath();
 
-        $width = (int)$width;
-        $height = (int)$height;
+        $width = (int) $width;
+        $height = (int) $height;
 
         $defaultOptions = [
-            'extension' => 'png',
-            'quality' => 95,
-            'mode' => 'auto',
-            'offset' => [0, 0]
+            'mode'      => 'auto',
+            'offset'    => [0, 0],
+            'quality'   => 95,
+            'extension' => 'jpg',
         ];
 
         if (!is_array($options))
@@ -360,7 +365,7 @@ class File extends Model
      * Checks if directory is empty then deletes it,
      * three levels up to match the partition directory.
      */
-    private function deleteEmptyDirectory($dir = null)
+    protected function deleteEmptyDirectory($dir = null)
     {
         if (!$this->isDirectoryEmpty($dir))
             return;
@@ -376,14 +381,14 @@ class File extends Model
         $dir = dirname($dir);
         if (!$this->isDirectoryEmpty($dir))
             return;
-        
+
         FileHelper::deleteDirectory($dir);
     }
 
     /**
      * Returns true if a directory contains no files.
      */
-    private function isDirectoryEmpty($dir = null)
+    protected function isDirectoryEmpty($dir = null)
     {
         if (!is_readable($dir))
             return false;

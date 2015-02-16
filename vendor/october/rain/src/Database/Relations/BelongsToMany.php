@@ -5,6 +5,31 @@ use Illuminate\Database\Eloquent\Model;
 
 class BelongsToMany extends BelongsToManyBase
 {
+
+    use DeferOneOrMany;
+
+    /**
+     * Save the supplied related model with deferred binding support.
+     */
+    public function save(Model $model, array $pivotData = [], $sessionKey = null)
+    {
+        $model->save();
+        $this->add($model, $sessionKey, $pivotData);
+        return $model;
+    }
+
+    /**
+     * Create a new instance of this related model with deferred binding support.
+     */
+    public function create(array $attributes, array $pivotData = [], $sessionKey = null)
+    {
+        $model = $this->related->create($attributes);
+
+        $this->add($model, $sessionKey, $pivotData);
+
+        return $model;
+    }
+
     /**
      * Adds a model to this relationship type.
      */
@@ -32,37 +57,22 @@ class BelongsToMany extends BelongsToManyBase
     }
 
     /**
-     * Returns the model query with deferred bindings added
+     * Set the left join clause for the relation query, used by DeferOneOrMany.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|null
+     * @return $this
      */
-    public function withDeferred($sessionKey)
-    {
-        // @todo See DeferOneOrMany trait
-    }
-
-    /**
-     * Joins the relationship tables to a query as a LEFT JOIN.
-     */
-    public function joinWithQuery($query)
+    protected function setLeftJoin($query = null)
     {
         $query = $query ?: $this->query;
 
-        /*
-         * Join the pivot table
-         */
+        $baseTable = $this->related->getTable();
 
-        $foreignTable = $this->parent->getTable();
-        $foreignKey = $foreignTable.'.'.$this->parent->getKeyName();
+        $key = $baseTable.'.'.$this->related->getKeyName();
 
-        $query->leftJoin($this->table, $foreignKey, '=', $this->getForeignKey());
-
-        /*
-         * Join the 'other' relation table
-         */
-        $otherTable = $this->related->getTable();
-        $otherKey = $otherTable.'.'.$this->related->getKeyName();
-
-        $query->leftJoin($otherTable, $otherKey, '=', $this->getOtherKey());
+        $query->leftJoin($this->table, $key, '=', $this->getOtherKey());
 
         return $this;
     }
+
 }

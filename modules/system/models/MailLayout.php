@@ -3,6 +3,12 @@
 use Model;
 use System\Classes\ApplicationException;
 
+/**
+ * Mail layout
+ *
+ * @package october\system
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class MailLayout extends Model
 {
     use \October\Rain\Database\Traits\Validation;
@@ -20,8 +26,8 @@ class MailLayout extends Model
 
     public function beforeDelete()
     {
-        if ($this->is_locked)
+        if ($this->is_locked) {
             throw new ApplicationException('Cannot delete this template because it is locked');
-
+        }
     }
 }

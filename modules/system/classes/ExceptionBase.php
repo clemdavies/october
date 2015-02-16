@@ -2,7 +2,9 @@
 
 use URL;
 use File;
+use Config;
 use Exception;
+use System\Classes\ApplicationException;
 
 /**
  * The base exception class.
@@ -14,11 +16,10 @@ use Exception;
  */
 class ExceptionBase extends Exception
 {
-
     /**
      * @var Exception If this exception is acting as a mask, this property stores the face exception.
      */
-    private $mask;
+    protected $mask;
 
     /**
      * @var string Hint Message to help the user with troubleshooting the error (optional).
@@ -43,7 +44,7 @@ class ExceptionBase extends Exception
     /**
      * @var stdObject Cached code information for highlighting code.
      */
-    private $highlight;
+    protected $highlight;
 
     /**
      * CMS base exception class constructor. Inherits the native PHP Exception.
@@ -60,11 +61,34 @@ class ExceptionBase extends Exception
             $this->className = get_called_class();
         }
 
-        if ($this->errorType === null)  {
+        if ($this->errorType === null) {
             $this->errorType = 'Undefined';
         }
 
         parent::__construct($message, $code, $previous);
+    }
+
+    /**
+     * Returns a more descriptive error message if application
+     * debug mode is turned on.
+     * @param Exception $exception
+     * @return string
+     */
+    public static function getDetailedMessage($exception)
+    {
+        /*
+         * Application Exceptions never display a detailed error
+         */
+        if (!($exception instanceof ApplicationException) && Config::get('app.debug', false)) {
+            return sprintf('"%s" on line %s of %s',
+                $exception->getMessage(),
+                $exception->getLine(),
+                $exception->getFile()
+            );
+        }
+        else {
+            return $exception->getMessage();
+        }
     }
 
     /**
@@ -140,8 +164,9 @@ class ExceptionBase extends Exception
      */
     public function getTrueException()
     {
-        if ($this->mask !== null)
+        if ($this->mask !== null) {
             return $this->mask;
+        }
 
         return $this;
     }
@@ -157,8 +182,9 @@ class ExceptionBase extends Exception
      */
     public function getHighlight()
     {
-        if ($this->highlight !== null)
+        if ($this->highlight !== null) {
             return $this->highlight;
+        }
 
         if (!$this->fileContent && File::exists($this->file) && is_readable($this->file)) {
             $this->fileContent = @file($this->file);
@@ -167,13 +193,15 @@ class ExceptionBase extends Exception
         $errorLine = $this->line - 1;
         $startLine = $errorLine - 6;
 
-        if ($startLine < 0)
+        if ($startLine < 0) {
             $startLine = 0;
+        }
 
         $endLine = $startLine + 12;
         $lineNum = count($this->fileContent);
-        if ($endLine > $lineNum-1)
+        if ($endLine > $lineNum-1) {
             $endLine = $lineNum-1;
+        }
 
         $areaLines = array_slice($this->fileContent, $startLine, $endLine - $startLine + 1);
 
@@ -222,8 +250,8 @@ class ExceptionBase extends Exception
         
         foreach ($traceInfo as $index => $event) {
 
-            $functionName = (isset($event['class']) && strlen($event['class'])) 
-                ? $event['class'].$event['type'].$event['function'] 
+            $functionName = (isset($event['class']) && strlen($event['class']))
+                ? $event['class'].$event['type'].$event['function']
                 : $event['function'];
 
             $file = isset($event['file']) ? URL::to(str_replace(public_path(), '', $event['file'])) : null;
@@ -254,20 +282,25 @@ class ExceptionBase extends Exception
      * @param array $traceInfo The trace information from getTrace() or debug_backtrace().
      * @return array The filtered array containing the trace information.
      */
-    private function filterCallStack($traceInfo)
+    protected function filterCallStack($traceInfo)
     {
         /*
          * Determine if filter should be used at all.
          */
         $useFilter = false;
         foreach ($traceInfo as $event) {
-            if (isset($event['class']) && $event['class'] == 'Illuminate\Exception\Handler' && $event['function'] == 'handleError') {
+            if (
+                isset($event['class']) &&
+                $event['class'] == 'Illuminate\Exception\Handler' &&
+                $event['function'] == 'handleError'
+            ) {
                 $useFilter = true;
             }
         }
 
-        if (!$useFilter)
+        if (!$useFilter) {
             return $traceInfo;
+        }
 
         $filterResult = [];
         $pruneResult = true;
@@ -275,13 +308,18 @@ class ExceptionBase extends Exception
             /*
              * Prune the tail end of the trace from the framework exception handler.
              */
-            if (isset($event['class']) && $event['class'] == 'Illuminate\Exception\Handler' && $event['function'] == 'handleError') {
+            if (
+                isset($event['class']) &&
+                $event['class'] == 'Illuminate\Exception\Handler' &&
+                $event['function'] == 'handleError'
+            ) {
                 $pruneResult = false;
                 continue;
             }
 
-            if ($pruneResult)
+            if ($pruneResult) {
                 continue;
+            }
 
             $filterResult[$index] = $event;
         }
@@ -304,42 +342,48 @@ class ExceptionBase extends Exception
                 $items = array();
 
                 foreach ($argument as $index => $obj) {
-                    if (is_array($obj))
+                    if (is_array($obj)) {
                         $value = 'array('.count($obj).')';
-
-                    elseif (is_object($obj))
+                    }
+                    elseif (is_object($obj)) {
                         $value = 'object('.get_class($obj).')';
-
-                    elseif (is_integer($obj))
+                    }
+                    elseif (is_integer($obj)) {
                         $value = $obj;
-
-                    elseif ($obj === null)
+                    }
+                    elseif ($obj === null) {
                         $value = "null";
-
-                    else
+                    }
+                    else {
                         $value = "'".$obj."'";
+                    }
 
                     $items[] = $index . ' => ' . $value;
                 }
 
-                if (count($items))
+                if (count($items)) {
                     $arg = 'array(' . count($argument) . ') [' . implode(', ', $items) . ']';
-                else
+                }
+                else {
                     $arg = 'array(0)';
+                }
             }
-            elseif (is_object($argument))
+            elseif (is_object($argument)) {
                 $arg = 'object('.get_class($argument).')';
-            elseif ($argument === null)
+            }
+            elseif ($argument === null) {
                 $arg = "null";
-            elseif (is_integer($argument))
+            }
+            elseif (is_integer($argument)) {
                 $arg = $argument;
-            else
+            }
+            else {
                 $arg = "'".$argument."'";
+            }
 
             $argsArray[] = $arg;
         }
 
         return implode(', ', $argsArray);
     }
-
 }

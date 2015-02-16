@@ -13,6 +13,7 @@
         this.options = options || {};
 
         this.bindDependants()
+        this.toggleEmptyTabs()
     }
 
     FormWidget.DEFAULTS = {
@@ -32,7 +33,7 @@
          * Map master and slave field map
          */
         form.find('[data-field-depends]').each(function(){
-            var name = $(this).data('column-name'),
+            var name = $(this).data('field-name'),
                 depends = $(this).data('field-depends')
 
             $.each(depends, function(index, depend){
@@ -46,23 +47,36 @@
         /*
          * When a master is updated, refresh its slaves
          */
-        $.each(fieldMap, function(columnName, toRefresh){
-            form.find('[data-column-name="'+columnName+'"]')
+        $.each(fieldMap, function(fieldName, toRefresh){
+            form.find('[data-field-name="'+fieldName+'"]')
                 .on('change', 'select, input', function(){
                     formEl.request(self.options.refreshHandler, {
                         data: toRefresh
+                    }).success(function(){
+                        self.toggleEmptyTabs()
                     })
 
                     $.each(toRefresh.fields, function(index, field){
-                        form.find('[data-column-name="'+field+'"]')
+                        form.find('[data-field-name="'+field+'"]:visible')
                             .addClass('loading-indicator-container size-form-field')
                             .loadIndicator()
                     })
                 })
         })
-
     }
 
+    FormWidget.prototype.toggleEmptyTabs = function() {
+        var tabControl = $('[data-control=tab]', this.$el)
+
+        if (!tabControl.length)
+            return
+
+        $('.tab-pane', tabControl).each(function(){
+            $('[data-target="#' + $(this).attr('id') + '"]', tabControl)
+                .toggle(!!$('.form-group:not(:empty)', $(this)).length)
+        })
+
+    }
 
     // FORM WIDGET PLUGIN DEFINITION
     // ============================
@@ -97,7 +111,7 @@
 
     // FORM WIDGET DATA-API
     // ==============
-    
+
     $(document).render(function(){
         $('[data-control="formwidget"]').formWidget();
     })

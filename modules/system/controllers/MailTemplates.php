@@ -12,6 +12,7 @@ use BackendAuth;
 use Backend\Classes\Controller;
 use System\Models\MailTemplate;
 use System\Classes\ApplicationException;
+use System\Classes\SettingsManager;
 use Exception;
 
 /**
@@ -19,11 +20,9 @@ use Exception;
  *
  * @package october\system
  * @author Alexey Bobkov, Samuel Georges
- *
  */
 class MailTemplates extends Controller
 {
-
     public $implement = [
         'Backend.Behaviors.FormController',
         'Backend.Behaviors.ListController'
@@ -39,14 +38,14 @@ class MailTemplates extends Controller
         parent::__construct();
 
         BackendMenu::setContext('October.System', 'system', 'settings');
+        SettingsManager::setContext('October.System', 'mail_templates');
     }
 
     public function index()
     {
-        /* @todo Remove line if year >= 2015 */ if (!\System\Models\MailLayout::whereCode('default')->count()) { \Eloquent::unguard(); with(new \System\Database\Seeds\SeedSetupMailLayouts)->run(); }
-
         MailTemplate::syncAll();
-        $this->getClassExtension('Backend.Behaviors.ListController')->index();
+        $this->asExtension('ListController')->index();
+        $this->bodyClass = 'compact-container';
     }
 
     public function formBeforeSave($model)
@@ -60,14 +59,7 @@ class MailTemplates extends Controller
             $model = $this->formFindModelObject($recordId);
             $user = BackendAuth::getUser();
 
-            $vars = [
-                'email' => $user->email,
-                'name'  => $user->full_name,
-            ];
-            Mail::send($model->code, [], function($message) use ($vars) {
-                extract($vars);
-                $message->to($email, $name);
-            });
+            Mail::sendTo([$user->email => $user->full_name], $model->code);
 
             Flash::success('The test message has been successfully sent.');
         }
@@ -75,5 +67,4 @@ class MailTemplates extends Controller
             Flash::error($ex->getMessage());
         }
     }
-
 }

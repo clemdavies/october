@@ -88,7 +88,7 @@ class CodeEditor extends FormWidgetBase
     }
 
     /**
-     * Prepares the list data
+     * Prepares the widget data
      */
     public function prepareVars()
     {
@@ -106,7 +106,7 @@ class CodeEditor extends FormWidgetBase
         $this->vars['stretch'] = $this->formField->stretch;
         $this->vars['size'] = $this->formField->size;
         $this->vars['name'] = $this->formField->getName();
-        $this->vars['value'] = $this->model->{$this->columnName};
+        $this->vars['value'] = $this->getLoadValue();
     }
 
     /**
@@ -118,5 +118,4 @@ class CodeEditor extends FormWidgetBase
         $this->addJs('vendor/ace/ace.js', 'core');
         $this->addJs('js/codeeditor.js', 'core');
     }
-
 }

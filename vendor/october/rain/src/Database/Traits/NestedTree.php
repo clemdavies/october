@@ -72,7 +72,7 @@ trait NestedTree
     /**
      * @var int Indicates if the model should be aligned to new parent.
      */
-    private $moveToNewParentId = null;
+    protected $moveToNewParentId = null;
 
     /*
      * Constructor
@@ -87,13 +87,13 @@ trait NestedTree
              */
             $model->hasMany['children'] = [
                 get_class($model),
-                'primaryKey' => $model->getParentColumnName(),
+                'key' => $model->getParentColumnName(),
                 'order' => $model->getLeftColumnName()
             ];
 
             $model->belongsTo['parent'] = [
                 get_class($model),
-                'foreignKey' => $model->getParentColumnName()
+                'key' => $model->getParentColumnName()
             ];
         });
 

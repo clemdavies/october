@@ -46,7 +46,7 @@ class Lists extends WidgetBase
     protected $visibleColumns;
 
     /**
-     * @var array All available columns.
+     * @var array Collection of all list columns used in this list.
      */
     protected $columns;
 
@@ -66,7 +66,7 @@ class Lists extends WidgetBase
     public $recordOnClick;
 
     /**
-     * @var int Rows to display for each page.
+     * @var int Maximum rows to display for each page.
      */
     public $recordsPerPage;
 
@@ -78,7 +78,12 @@ class Lists extends WidgetBase
     /**
      * @var string Filter the records by a search term.
      */
-    public $searchTerm;
+    protected $searchTerm;
+
+    /**
+     * @var array Collection of functions to apply to each list query.
+     */
+    protected $filterCallbacks = [];
 
     /**
      * @var bool Shows the sorting options for each column.
@@ -128,7 +133,7 @@ class Lists extends WidgetBase
     /**
      * @var bool Expand the tree nodes by default.
      */
-    public $treeExpanded = true;
+    public $treeExpanded = false;
 
     /**
      * @var array List of CSS classes to apply to the list container element
@@ -147,7 +152,10 @@ class Lists extends WidgetBase
          */
         $this->recordUrl = $this->getConfig('recordUrl', $this->recordUrl);
         $this->recordOnClick = $this->getConfig('recordOnClick', $this->recordOnClick);
-        $this->recordsPerPage = $this->getSession('per_page', $this->getConfig('recordsPerPage', $this->recordsPerPage));
+        $this->recordsPerPage = $this->getSession(
+            'per_page',
+            $this->getConfig('recordsPerPage', $this->recordsPerPage)
+        );
         $this->noRecordsMessage = $this->getConfig('noRecordsMessage', $this->noRecordsMessage);
         $this->defaultSort = $this->getConfig('defaultSort', $this->defaultSort);
         $this->showSorting = $this->getConfig('showSorting', $this->showSorting);
@@ -182,7 +190,7 @@ class Lists extends WidgetBase
     public function prepareVars()
     {
         $this->vars['cssClasses'] = implode(' ', $this->cssClasses);
-        $this->vars['columns'] = $this->getVisibleListColumns();
+        $this->vars['columns'] = $this->getVisibleColumns();
         $this->vars['columnTotal'] = $this->getTotalColumns();
         $this->vars['records'] = $this->getRecords();
         $this->vars['noRecordsMessage'] = trans($this->noRecordsMessage);
@@ -234,11 +242,19 @@ class Lists extends WidgetBase
     {
         $this->model = $this->getConfig('model');
 
-        if (!$this->model)
-            throw new ApplicationException(Lang::get('backend::lang.list.missing_model', ['class'=>get_class($this->controller)]));
+        if (!$this->model) {
+            throw new ApplicationException(Lang::get(
+                'backend::lang.list.missing_model',
+                ['class'=>get_class($this->controller)]
+            ));
+        }
 
-        if (!$this->model instanceof Model)
-            throw new ApplicationException(Lang::get('backend::lang.model.invalid_class', ['model'=>get_class($this->model), 'class'=>get_class($this->controller)]));
+        if (!$this->model instanceof Model) {
+            throw new ApplicationException(Lang::get(
+                'backend::lang.model.invalid_class',
+                ['model'=>get_class($this->model), 'class'=>get_class($this->controller)]
+            ));
+        }
 
         return $this->model;
     }
@@ -249,7 +265,7 @@ class Lists extends WidgetBase
      * @param  string $table
      * @return string
      */
-    private function parseTableName($sql, $table)
+    protected function parseTableName($sql, $table)
     {
         return str_replace('@', $table.'.', $sql);
     }
@@ -257,12 +273,13 @@ class Lists extends WidgetBase
     /**
      * Applies any filters to the model.
      */
-    protected function prepareModel()
+    public function prepareModel()
     {
         $query = $this->model->newQuery();
-        $selects = [$this->model->getTable().'.*'];
-        $tables = ['base'=>$this->model->getTable()];
+        $primaryTable = $this->model->getTable();
+        $selects = [$primaryTable.'.*'];
         $joins = [];
+        $withs = [];
 
         /*
          * Extensibility
@@ -271,76 +288,152 @@ class Lists extends WidgetBase
         $this->fireEvent('list.extendQueryBefore', [$query]);
 
         /*
-         * Related custom selects, must come first
+         * Prepare searchable column names
          */
-        foreach ($this->getVisibleListColumns() as $column) {
-            if (!isset($column->relation) || !isset($column->sqlSelect))
-                continue;
+        $primarySearchable = [];
+        $relationSearchable = [];
 
-            if (!$this->model->hasRelation($column->relation))
-                throw new ApplicationException(Lang::get('backend::lang.model.missing_relation', ['class'=>get_class($this->model), 'relation'=>$column->relation]));
+        $columnsToSearch = [];
+        if (!empty($this->searchTerm) && ($searchableColumns = $this->getSearchableColumns())) {
+            foreach ($searchableColumns as $column) {
+                /*
+                 * Related
+                 */
+                if ($this->isColumnRelated($column)) {
+                    $table = $this->model->makeRelation($column->relation)->getTable();
+                    $columnName = isset($column->sqlSelect)
+                        ? DbDongle::raw($this->parseTableName($column->sqlSelect, $table))
+                        : $table . '.' . $column->valueFrom;
 
-            $alias = Db::getQueryGrammar()->wrap($column->columnName);
-            $table =  $this->model->makeRelation($column->relation)->getTable();
-            $relationType = $this->model->getRelationType($column->relation);
-            $sqlSelect = $this->parseTableName($column->sqlSelect, $table);
+                    $relationSearchable[$column->relation][] = $columnName;
+                }
+                /*
+                 * Primary
+                 */
+                else {
+                    $columnName = isset($column->sqlSelect)
+                        ? DbDongle::raw($this->parseTableName($column->sqlSelect, $primaryTable))
+                        : $primaryTable . '.' . $column->columnName;
 
-            if (in_array($relationType, ['hasMany', 'belongsToMany', 'morphToMany', 'morphedByMany', 'morphMany', 'attachMany', 'hasManyThrough']))
-                $selects[] = DbDongle::raw("group_concat(" . $sqlSelect . " separator ', ') as ". $alias);
-            else
-                $selects[] = DbDongle::raw($sqlSelect . ' as '. $alias);
-
-            $joins[] = $column->relation;
-            $tables[$column->relation] = $table;
+                    $primarySearchable[] = $columnName;
+                }
+            }
         }
 
-        if ($joins)
-            $query->joinWith(array_unique($joins), false);
+        /*
+         * Prepare related eager loads (withs) and custom selects (joins)
+         */
+        foreach ($this->getVisibleColumns() as $column) {
+
+            if (!$this->isColumnRelated($column) || (!isset($column->sqlSelect) && !isset($column->valueFrom))) {
+                continue;
+            }
+
+            if (isset($column->valueFrom)) {
+                $withs[] = $column->relation;
+            }
+
+            $joins[] = $column->relation;
+        }
+
+        /*
+         * Include any relation constraints
+         */
+        if ($joins) {
+            foreach (array_unique($joins) as $join) {
+                /*
+                 * Apply a supplied search term for relation columns and
+                 * constrain the query only if there is something to search for
+                 */
+                $columnsToSearch = array_get($relationSearchable, $join, []);
+
+                if (count($columnsToSearch) > 0) {
+                    $query->whereHas($join, function ($_query) use ($columnsToSearch) {
+                        $_query->searchWhere($this->searchTerm, $columnsToSearch);
+                    });
+                }
+            }
+        }
+
+        /*
+         * Add eager loads to the query
+         */
+        if ($withs) {
+            $query->with(array_unique($withs));
+        }
 
         /*
          * Custom select queries
          */
-        foreach ($this->getVisibleListColumns() as $column) {
-            if (!isset($column->sqlSelect) || isset($column->relation))
+        foreach ($this->getVisibleColumns() as $column) {
+            if (!isset($column->sqlSelect)) {
                 continue;
+            }
 
             $alias = Db::getQueryGrammar()->wrap($column->columnName);
-            $sqlSelect = $this->parseTableName($column->sqlSelect, $tables['base']);
-            $selects[] = DbDongle::raw($sqlSelect . ' as '. $alias);
+
+            /*
+             * Relation column
+             */
+            if (isset($column->relation)) {
+                $table =  $this->model->makeRelation($column->relation)->getTable();
+                $relationType = $this->model->getRelationType($column->relation);
+                $sqlSelect = $this->parseTableName($column->sqlSelect, $table);
+
+                /*
+                 * Manipulate a count query for the sub query
+                 */
+                $relationObj = $this->model->{$column->relation}();
+                $countQuery = $relationObj->getRelationCountQuery($relationObj->getRelated()->newQuery(), $query);
+
+                $joinSql = $this->isColumnRelated($column, true)
+                    ? DbDongle::raw("group_concat(" . $sqlSelect . " separator ', ')")
+                    : DbDongle::raw($sqlSelect);
+
+                $joinSql = $countQuery->select($joinSql)->toSql();
+
+                $selects[] = Db::raw("(".$joinSql.") as ".$alias);
+            }
+            /*
+             * Primary column
+             */
+            else {
+                $sqlSelect = $this->parseTableName($column->sqlSelect, $primaryTable);
+                $selects[] = DbDongle::raw($sqlSelect . ' as '. $alias);
+            }
         }
 
         /*
-         * Handle a supplied search term
+         * Apply a supplied search term for primary columns
          */
-        if (!empty($this->searchTerm) && ($searchableColumns = $this->getSearchableColumns())) {
-            $query->orWhere(function($innerQuery) use ($searchableColumns, $tables) {
-                $columnsToSearch = [];
-                foreach ($searchableColumns as $column) {
-
-                    if (isset($column->sqlSelect)) {
-                        $table = (isset($column->relation)) ? $tables[$column->relation] : 'base';
-                        $columnName = DbDongle::raw($this->parseTableName($column->sqlSelect, $table));
-                    }
-                    else
-                        $columnName = $tables['base'] . '.' . $column->columnName;
-
-                    $columnsToSearch[] = $columnName;
-                }
-
-                $innerQuery->searchWhere($this->searchTerm, $columnsToSearch);
+        if (count($primarySearchable) > 0) {
+            $query->orWhere(function ($innerQuery) use ($primarySearchable) {
+                $innerQuery->searchWhere($this->searchTerm, $primarySearchable);
             });
         }
 
         /*
-         * Handle sorting
+         * Apply sorting
          */
         if ($sortColumn = $this->getSortColumn()) {
+            if (($column = array_get($this->columns, $sortColumn)) && $column->valueFrom) {
+                $sortColumn = $column->valueFrom;
+            }
+
             $query->orderBy($sortColumn, $this->sortDirection);
         }
 
         /*
-         * @todo Apply filters etc
+         * Apply filters
          */
+        foreach ($this->filterCallbacks as $callback) {
+            $callback($query);
+        }
+
+        /*
+         * Add custom selects
+         */
+        $query->select($selects);
 
         /*
          * Extensibility
@@ -348,9 +441,6 @@ class Lists extends WidgetBase
         Event::fire('backend.list.extendQuery', [$this, $query]);
         $this->fireEvent('list.extendQuery', [$query]);
 
-        // Grouping due to the joinWith() call
-        $query->select($selects);
-        $query->groupBy($this->model->getQualifiedKeyName());
         return $query;
     }
 
@@ -368,6 +458,7 @@ class Lists extends WidgetBase
             $records = ($this->showPagination)
                 ? $model->paginate($this->recordsPerPage)
                 : $model->get();
+
         }
 
         return $this->records = $records;
@@ -380,11 +471,13 @@ class Lists extends WidgetBase
      */
     public function getRecordUrl($record)
     {
-        if (isset($this->recordOnClick))
+        if (isset($this->recordOnClick)) {
             return 'javascript:;';
+        }
 
-        if (!isset($this->recordUrl))
+        if (!isset($this->recordUrl)) {
             return null;
+        }
 
         $columns = array_keys($record->getAttributes());
         $url = RouterHelper::parseValues($record, $columns, $this->recordUrl);
@@ -398,8 +491,9 @@ class Lists extends WidgetBase
      */
     public function getRecordOnClick($record)
     {
-        if (!isset($this->recordOnClick))
+        if (!isset($this->recordOnClick)) {
             return null;
+        }
 
         $columns = array_keys($record->getAttributes());
         $recordOnClick = RouterHelper::parseValues($record, $columns, $this->recordOnClick);
@@ -407,26 +501,51 @@ class Lists extends WidgetBase
     }
 
     /**
+     * Get all the registered columns for the instance.
+     * @return array
+     */
+    public function getColumns()
+    {
+        return $this->columns ?: $this->defineListColumns();
+    }
+
+    /**
+     * Get a specified column object
+     * @param  string $column
+     * @return mixed
+     */
+    public function getColumn($column)
+    {
+        return $this->columns[$column];
+    }
+
+    /**
      * Returns the list columns that are visible by list settings or default
      */
-    protected function getVisibleListColumns()
+    public function getVisibleColumns()
     {
-        $definitions = $this->getListColumns();
+        $definitions = $this->defineListColumns();
         $columns = [];
 
         /*
          * Supplied column list
          */
-        if ($this->columnOverride === null)
+        if ($this->columnOverride === null) {
             $this->columnOverride = $this->getSession('visible', null);
+        }
 
         if ($this->columnOverride && is_array($this->columnOverride)) {
 
             $invalidColumns = array_diff($this->columnOverride, array_keys($definitions));
-            if (!count($definitions))
-                throw new ApplicationException(Lang::get('backend::lang.list.missing_column', ['columns'=>implode(',', $invalidColumns)]));
+            if (!count($definitions)) {
+                throw new ApplicationException(Lang::get(
+                    'backend::lang.list.missing_column',
+                    ['columns'=>implode(',', $invalidColumns)]
+                ));
+            }
 
-            foreach ($this->columnOverride as $columnName) {
+            $availableColumns = array_intersect($this->columnOverride, array_keys($definitions));
+            foreach ($availableColumns as $columnName) {
                 $definitions[$columnName]->invisible = false;
                 $columns[$columnName] = $definitions[$columnName];
             }
@@ -436,8 +555,9 @@ class Lists extends WidgetBase
          */
         else {
             foreach ($definitions as $columnName => $column) {
-                if ($column->invisible)
+                if ($column->invisible) {
                     continue;
+                }
 
                 $columns[$columnName] = $definitions[$columnName];
             }
@@ -449,10 +569,14 @@ class Lists extends WidgetBase
     /**
      * Builds an array of list columns with keys as the column name and values as a ListColumn object.
      */
-    protected function getListColumns()
+    protected function defineListColumns()
     {
-        if (!isset($this->config->columns) || !is_array($this->config->columns) || !count($this->config->columns))
-            throw new ApplicationException(Lang::get('backend::lang.list.missing_columns', ['class'=>get_class($this->controller)]));
+        if (!isset($this->config->columns) || !is_array($this->config->columns) || !count($this->config->columns)) {
+            throw new ApplicationException(Lang::get(
+                'backend::lang.list.missing_columns',
+                ['class'=>get_class($this->controller)]
+            ));
+        }
 
         $this->addColumns($this->config->columns);
 
@@ -468,7 +592,9 @@ class Lists extends WidgetBase
         if ($columnOrder = $this->getSession('order', null)) {
             $orderedDefinitions = [];
             foreach ($columnOrder as $column) {
-                $orderedDefinitions[$column] = $this->columns[$column];
+                if (isset($this->columns[$column])) {
+                    $orderedDefinitions[$column] = $this->columns[$column];
+                }
             }
 
             $this->columns = array_merge($orderedDefinitions, $this->columns);
@@ -495,25 +621,20 @@ class Lists extends WidgetBase
      */
     protected function makeListColumn($name, $config)
     {
-        if (is_string($config))
+        if (is_string($config)) {
             $label = $config;
-        elseif (isset($config['label']))
+        }
+        elseif (isset($config['label'])) {
             $label = $config['label'];
-        else
+        }
+        else {
             $label = studly_case($name);
+        }
+
+        $columnType = isset($config['type']) ? $config['type'] : null;
 
         $column = new ListColumn($name, $label);
-
-        /*
-         * Process options
-         */
-        if (isset($config['type'])) $column->type = $config['type'];
-        if (isset($config['searchable'])) $column->searchable = $config['searchable'];
-        if (isset($config['sortable'])) $column->sortable = $config['sortable'];
-        if (isset($config['invisible'])) $column->invisible = $config['invisible'];
-        if (isset($config['select'])) $column->sqlSelect = $config['select'];
-        if (isset($config['relation'])) $column->relation = $config['relation'];
-        if (isset($config['format'])) $column->format = $config['format'];
+        $column->displayAs($columnType, $config);
 
         return $column;
     }
@@ -524,10 +645,14 @@ class Lists extends WidgetBase
      */
     protected function getTotalColumns()
     {
-        $columns = $this->visibleColumns ?: $this->getVisibleListColumns();
+        $columns = $this->visibleColumns ?: $this->getVisibleColumns();
         $total = count($columns);
-        if ($this->showCheckboxes) $total++;
-        if ($this->showSetup) $total++;
+        if ($this->showCheckboxes) {
+            $total++;
+        }
+        if ($this->showSetup) {
+            $total++;
+        }
         return $total;
     }
 
@@ -541,11 +666,13 @@ class Lists extends WidgetBase
         /*
          * Extensibility
          */
-        if ($response = Event::fire('backend.list.overrideHeaderValue', [$this, $column, $value], true))
+        if ($response = Event::fire('backend.list.overrideHeaderValue', [$this, $column, $value], true)) {
             $value = $response;
+        }
 
-        if ($response = $this->fireEvent('list.overrideHeaderValue', [$column, $value], true))
+        if ($response = $this->fireEvent('list.overrideHeaderValue', [$column, $value], true)) {
             $value = $response;
+        }
 
         return $value;
     }
@@ -555,28 +682,61 @@ class Lists extends WidgetBase
      */
     public function getColumnValue($record, $column)
     {
+        $columnName = $column->columnName;
+
         /*
-         * If the column is a relation, it will be a custom select,
+         * Handle taking value from model relation.
+         */
+        if ($column->valueFrom && $column->relation) {
+            $columnName = $column->relation;
+
+            if (!array_key_exists($columnName, $record->getRelations())) {
+                $value = null;
+            }
+            elseif ($this->isColumnRelated($column, true)) {
+                $value = implode(', ', $record->{$columnName}->lists($column->valueFrom));
+            }
+            elseif ($this->isColumnRelated($column)) {
+                $value = $record->{$columnName}->{$column->valueFrom};
+            }
+            else {
+                $value = null;
+            }
+        }
+        /*
+         * Handle taking value from model attribute.
+         */
+        elseif ($column->valueFrom) {
+            $value = $record->{$column->valueFrom};
+        }
+        /*
+         * Otherwise, if the column is a relation, it will be a custom select,
          * so prevent the Model from attempting to load the relation
          * if the value is NULL.
          */
-        $columnName = $column->columnName;
-        if ($record->hasRelation($columnName) && array_key_exists($columnName, $record->attributes))
-            $value = $record->attributes[$columnName];
-        else
-            $value = $record->{$columnName};
+        else {
+            if ($record->hasRelation($columnName) && array_key_exists($columnName, $record->attributes)) {
+                $value = $record->attributes[$columnName];
+            }
+            else {
+                $value = $record->{$columnName};
+            }
+        }
 
-        if (method_exists($this, 'eval'. studly_case($column->type) .'TypeValue'))
-            $value = $this->{'eval'. studly_case($column->type) .'TypeValue'}($value, $column);
+        if (method_exists($this, 'eval'. studly_case($column->type) .'TypeValue')) {
+            $value = $this->{'eval'. studly_case($column->type) .'TypeValue'}($record, $column, $value);
+        }
 
         /*
          * Extensibility
          */
-        if ($response = Event::fire('backend.list.overrideColumnValue', [$this, $record, $column, $value], true))
+        if ($response = Event::fire('backend.list.overrideColumnValue', [$this, $record, $column, $value], true)) {
             $value = $response;
+        }
 
-        if ($response = $this->fireEvent('list.overrideColumnValue', [$record, $column, $value], true))
+        if ($response = $this->fireEvent('list.overrideColumnValue', [$record, $column, $value], true)) {
             $value = $response;
+        }
 
         return $value;
     }
@@ -593,11 +753,13 @@ class Lists extends WidgetBase
         /*
          * Extensibility
          */
-        if ($response = Event::fire('backend.list.injectRowClass', [$this, $record], true))
+        if ($response = Event::fire('backend.list.injectRowClass', [$this, $record], true)) {
             $value = $response;
+        }
 
-        if ($response = $this->fireEvent('list.injectRowClass', [$record], true))
+        if ($response = $this->fireEvent('list.injectRowClass', [$record], true)) {
             $value = $response;
+        }
 
         return $value;
     }
@@ -609,7 +771,22 @@ class Lists extends WidgetBase
     /**
      * Process as boolean switch
      */
-    public function evalSwitchTypeValue($value, $column)
+    protected function evalPartialTypeValue($record, $column, $value)
+    {
+        return $this->controller->makePartial($column->path ?: $column->columnName, [
+            'listColumn' => $column,
+            'listRecord' => $record,
+            'listValue'  => $value,
+            'column'     => $column,
+            'record'     => $record,
+            'value'      => $value
+        ]);
+    }
+
+    /**
+     * Process as boolean switch
+     */
+    protected function evalSwitchTypeValue($record, $column, $value)
     {
         // return ($value) ? '<i class="icon-check"></i>' : '<i class="icon-times"></i>';
         return ($value) ? 'Yes' : 'No';
@@ -618,15 +795,17 @@ class Lists extends WidgetBase
     /**
      * Process as a datetime value
      */
-    public function evalDatetimeTypeValue($value, $column)
+    protected function evalDatetimeTypeValue($record, $column, $value)
     {
-        if ($value === null)
+        if ($value === null) {
             return null;
+        }
 
         $value = $this->validateDateTimeValue($value, $column);
 
-        if ($column->format !== null)
+        if ($column->format !== null) {
             return $value->format($column->format);
+        }
 
         return $value->toDayDateTimeString();
     }
@@ -634,15 +813,17 @@ class Lists extends WidgetBase
     /**
      * Process as a time value
      */
-    public function evalTimeTypeValue($value, $column)
+    protected function evalTimeTypeValue($record, $column, $value)
     {
-        if ($value === null)
+        if ($value === null) {
             return null;
+        }
 
         $value = $this->validateDateTimeValue($value, $column);
 
-        if ($column->format === null)
+        if ($column->format === null) {
             $column->format = 'g:i A';
+        }
 
         return $value->format($column->format);
     }
@@ -650,15 +831,17 @@ class Lists extends WidgetBase
     /**
      * Process as a date value
      */
-    public function evalDateTypeValue($value, $column)
+    protected function evalDateTypeValue($record, $column, $value)
     {
-        if ($value === null)
+        if ($value === null) {
             return null;
+        }
 
         $value = $this->validateDateTimeValue($value, $column);
 
-        if ($column->format !== null)
+        if ($column->format !== null) {
             return $value->format($column->format);
+        }
 
         return $value->toFormattedDateString();
     }
@@ -666,10 +849,11 @@ class Lists extends WidgetBase
     /**
      * Process as diff for humans (1 min ago)
      */
-    public function evalTimesinceTypeValue($value, $column)
+    protected function evalTimesinceTypeValue($record, $column, $value)
     {
-        if ($value === null)
+        if ($value === null) {
             return null;
+        }
 
         $value = $this->validateDateTimeValue($value, $column);
 
@@ -679,15 +863,29 @@ class Lists extends WidgetBase
     /**
      * Validates a column type as a date
      */
-    private function validateDateTimeValue($value, $column)
+    protected function validateDateTimeValue($value, $column)
     {
-        if ($value instanceof DateTime)
+        if ($value instanceof DateTime) {
             $value = Carbon::instance($value);
+        }
 
-        if (!$value instanceof Carbon)
-            throw new ApplicationException(Lang::get('backend::lang.list.invalid_column_datetime', ['column' => $column->columnName]));
+        if (!$value instanceof Carbon) {
+            throw new ApplicationException(Lang::get(
+                'backend::lang.list.invalid_column_datetime',
+                ['column' => $column->columnName]
+            ));
+        }
 
         return $value;
+    }
+
+    //
+    // Filtering
+    //
+
+    public function addFilter(callable $filter)
+    {
+        $this->filterCallbacks[] = $filter;
     }
 
     //
@@ -717,12 +915,13 @@ class Lists extends WidgetBase
      */
     protected function getSearchableColumns()
     {
-        $columns = $this->columns ?: $this->getListColumns();
+        $columns = $this->getColumns();
         $searchable = [];
 
         foreach ($columns as $column) {
-            if (!$column->searchable)
+            if (!$column->searchable) {
                 continue;
+            }
 
             $searchable[] = $column;
         }
@@ -746,10 +945,12 @@ class Lists extends WidgetBase
              */
             $sortOptions = ['column' => $this->getSortColumn(), 'direction' => $this->sortDirection];
 
-            if ($column != $sortOptions['column'] || $sortOptions['direction'] == 'asc')
+            if ($column != $sortOptions['column'] || $sortOptions['direction'] == 'asc') {
                 $this->sortDirection = $sortOptions['direction'] = 'desc';
-            else
+            }
+            else {
                 $this->sortDirection = $sortOptions['direction'] = 'asc';
+            }
 
             $this->sortColumn = $sortOptions['column'] = $column;
 
@@ -769,11 +970,13 @@ class Lists extends WidgetBase
      */
     protected function getSortColumn()
     {
-        if (!$this->isSortable())
+        if (!$this->isSortable()) {
             return false;
+        }
 
-        if ($this->sortColumn !== null)
+        if ($this->sortColumn !== null) {
             return $this->sortColumn;
+        }
 
         /*
          * User preference
@@ -782,17 +985,19 @@ class Lists extends WidgetBase
             $this->sortColumn = $sortOptions['column'];
             $this->sortDirection = $sortOptions['direction'];
         }
-        /*
-         * Supplied default
-         */
         else {
+            /*
+             * Supplied default
+             */
             if (is_string($this->defaultSort)) {
                 $this->sortColumn = $this->defaultSort;
                 $this->sortDirection = 'desc';
             }
             elseif (is_array($this->defaultSort) && isset($this->defaultSort['column'])) {
                 $this->sortColumn = $this->defaultSort['column'];
-                $this->sortDirection = (isset($this->defaultSort['direction'])) ? $this->defaultSort['direction'] : 'desc';
+                $this->sortDirection = (isset($this->defaultSort['direction'])) ?
+                    $this->defaultSort['direction'] :
+                    'desc';
             }
         }
 
@@ -800,7 +1005,8 @@ class Lists extends WidgetBase
          * First available column
          */
         if ($this->sortColumn === null || !$this->isSortable($this->sortColumn)) {
-            $columns = $this->visibleColumns ?: $this->getVisibleListColumns();
+            $columns = $this->visibleColumns ?: $this->getVisibleColumns();
+            $columns = array_filter($columns, function($column){ return $column->sortable; });
             $this->sortColumn = key($columns);
             $this->sortDirection = 'desc';
         }
@@ -813,10 +1019,12 @@ class Lists extends WidgetBase
      */
     protected function isSortable($column = null)
     {
-        if ($column === null)
+        if ($column === null) {
             return (count($this->getSortableColumns()) > 0);
-        else
+        }
+        else {
             return array_key_exists($column, $this->getSortableColumns());
+        }
     }
 
     /**
@@ -824,18 +1032,14 @@ class Lists extends WidgetBase
      */
     protected function getSortableColumns()
     {
-        if ($this->sortableColumns !== null)
+        if ($this->sortableColumns !== null) {
             return $this->sortableColumns;
-
-        $columns = $this->columns ?: $this->getListColumns();
-        $sortable = [];
-
-        foreach ($columns as $column) {
-            if (!$column->sortable)
-                continue;
-
-            $sortable[$column->columnName] = $column;
         }
+
+        $columns = $this->getColumns();
+        $sortable = array_filter($columns, function($column){
+            return $column->sortable;
+        });
 
         return $this->sortableColumns = $sortable;
     }
@@ -876,8 +1080,9 @@ class Lists extends WidgetBase
     protected function getSetupPerPageOptions()
     {
         $perPageOptions = [20, 40, 80, 100, 120];
-        if (!in_array($this->recordsPerPage, $perPageOptions))
+        if (!in_array($this->recordsPerPage, $perPageOptions)) {
             $perPageOptions[] = $this->recordsPerPage;
+        }
 
         sort($perPageOptions);
         return $perPageOptions;
@@ -891,12 +1096,12 @@ class Lists extends WidgetBase
         /*
          * Force all columns invisible
          */
-        $allColumns = $this->getListColumns();
-        foreach ($allColumns as $column) {
+        $columns = $this->defineListColumns();
+        foreach ($columns as $column) {
             $column->invisible = true;
         }
 
-        return array_merge($allColumns, $this->getVisibleListColumns());
+        return array_merge($columns, $this->getVisibleColumns());
     }
 
     //
@@ -909,15 +1114,23 @@ class Lists extends WidgetBase
      */
     public function validateTree()
     {
-        if (!$this->showTree) return;
+        if (!$this->showTree) {
+            return;
+        }
 
         $this->showSorting = $this->showPagination = false;
 
-        if (!$this->model->methodExists('getChildren'))
-            throw new ApplicationException('To display list as a tree, the specified model must have a method "getChildren"');
+        if (!$this->model->methodExists('getChildren')) {
+            throw new ApplicationException(
+                'To display list as a tree, the specified model must have a method "getChildren"'
+            );
+        }
 
-        if (!$this->model->methodExists('getChildCount'))
-            throw new ApplicationException('To display list as a tree, the specified model must have a method "getChildCount"');
+        if (!$this->model->methodExists('getChildCount')) {
+            throw new ApplicationException(
+                'To display list as a tree, the specified model must have a method "getChildCount"'
+            );
+        }
     }
 
     /**
@@ -941,4 +1154,43 @@ class Lists extends WidgetBase
         return $this->onRefresh();
     }
 
+    //
+    // Helpers
+    //
+
+    /**
+     * Check if column refers to a relation of the model
+     * @param  ListColumn  $column List column object
+     * @param  boolean     $multi  If set, returns true only if the relation is a "multiple relation type"
+     * @return boolean
+     */
+    protected function isColumnRelated($column, $multi = false)
+    {
+        if (!isset($column->relation)) {
+            return false;
+        }
+
+        if (!$this->model->hasRelation($column->relation)) {
+            throw new ApplicationException(Lang::get(
+                'backend::lang.model.missing_relation',
+                ['class'=>get_class($this->model), 'relation'=>$column->relation]
+            ));
+        }
+
+        if (!$multi) {
+            return true;
+        }
+
+        $relationType = $this->model->getRelationType($column->relation);
+
+        return in_array($relationType, [
+            'hasMany',
+            'belongsToMany',
+            'morphToMany',
+            'morphedByMany',
+            'morphMany',
+            'attachMany',
+            'hasManyThrough'
+        ]);
+    }
 }

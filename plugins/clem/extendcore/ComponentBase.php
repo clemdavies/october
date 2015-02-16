@@ -1,7 +1,7 @@
 <?php namespace Clem\ExtendCore;
 
 use Cms\Classes\ComponentBase as Core;
-use Cms\Classes\CombineAssets;
+use System\Classes\CombineAssets;
 use Request;
 
 /**
@@ -19,6 +19,7 @@ abstract class ComponentBase extends Core
      */
     public function addLess($name, $attributes = [])
     {
+
         $cssPath = $this->getAssetPath($name);
         $dirArray = explode('/',$cssPath);
         $filename = $dirArray[count($dirArray)-1];
@@ -26,7 +27,8 @@ abstract class ComponentBase extends Core
         $directory = implode('/', $dirArray );
 
         $cssPath = Request::getBaseUrl();
-        $cssPath .= CombineAssets::combine(array($filename),$directory);
+        $cssPath .= CombineAssets::combine(array($filename),$directory);// this line throws exception
+
 
         if (isset($this->controller))
             $this->controller->addCss($cssPath, $attributes);
@@ -38,6 +40,8 @@ abstract class ComponentBase extends Core
 
         if (!in_array($cssPath, $this->assets['css']))
             $this->assets['css'][] = ['path' => $cssPath, 'attributes' => $attributes];
+
+
     }
 
 }

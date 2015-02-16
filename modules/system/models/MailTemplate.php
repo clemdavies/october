@@ -7,6 +7,12 @@ use Model;
 use October\Rain\Mail\MailParser;
 use System\Classes\PluginManager;
 
+/**
+ * Mail template
+ *
+ * @package october\system
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class MailTemplate extends Model
 {
     use \October\Rain\Database\Traits\Validation;
@@ -49,18 +55,21 @@ class MailTemplate extends Model
          * Clean up non-customized templates
          */
         foreach ($dbTemplates as $code => $is_custom) {
-            if ($is_custom)
+            if ($is_custom) {
                 continue;
+            }
 
-            if (!array_key_exists($code, $templates))
+            if (!array_key_exists($code, $templates)) {
                 self::whereCode($code)->delete();
+            }
         }
 
         /*
          * Create new templates
          */
-        if (count($newTemplates))
+        if (count($newTemplates)) {
             $categories = MailLayout::lists('id', 'code');
+        }
 
         foreach ($newTemplates as $code => $description) {
             $sections = self::getTemplateSections($code);
@@ -93,13 +102,15 @@ class MailTemplate extends Model
     public static function addContentToMailer($message, $code, $data)
     {
         if (!isset(self::$cache[$code])) {
-            if (!$template = self::whereCode($code)->first())
+            if (!$template = self::whereCode($code)->first()) {
                 return false;
+            }
 
             self::$cache[$code] = $template;
         }
-        else
+        else {
             $template = self::$cache[$code];
+        }
 
         /*
          * Get Twig to load from a string
@@ -152,8 +163,9 @@ class MailTemplate extends Model
         $plugins = PluginManager::instance()->getPlugins();
         foreach ($plugins as $pluginId => $pluginObj) {
             $templates = $pluginObj->registerMailTemplates();
-            if (!is_array($templates))
+            if (!is_array($templates)) {
                 continue;
+            }
 
             $this->registerMailTemplates($templates);
         }
@@ -165,8 +177,9 @@ class MailTemplate extends Model
      */
     public function listRegisteredTemplates()
     {
-        if (self::$registeredTemplates === null)
+        if (self::$registeredTemplates === null) {
             $this->loadRegisteredTemplates();
+        }
 
         return self::$registeredTemplates;
     }
@@ -193,8 +206,9 @@ class MailTemplate extends Model
      */
     public function registerMailTemplates(array $definitions)
     {
-        if (!static::$registeredTemplates)
+        if (!static::$registeredTemplates) {
             static::$registeredTemplates = [];
+        }
 
         static::$registeredTemplates = array_merge(static::$registeredTemplates, $definitions);
     }

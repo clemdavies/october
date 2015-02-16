@@ -1,5 +1,10 @@
 <!-- Checkbox -->
-<div class="checkbox custom-checkbox">
+<div class="checkbox custom-checkbox" tabindex="0">
+    <input
+        type="hidden"
+        name="<?= $field->getName() ?>"
+        value="0"
+        <?= $this->previewMode ? 'disabled="disabled"' : '' ?>>
     <input
         type="checkbox"
         id="<?= $field->getId() ?>"
@@ -7,7 +12,7 @@
         value="1"
         <?= $this->previewMode ? 'disabled="disabled"' : '' ?>
         <?= $field->value == 1 ? 'checked="checked"' : '' ?>
-        <?= HTML::attributes($field->attributes) ?>>
+        <?= $field->getAttributes() ?>>
 
     <label for="<?= $field->getId() ?>">
         <?= e(trans($field->label)) ?>

@@ -6,9 +6,11 @@ use Backend;
 use Redirect;
 use Validator;
 use BackendAuth;
+use BackendMenu;
 use Backend\Models\User;
+use Backend\Models\AccessLog;
 use Backend\Classes\Controller;
-use System\Classes\VersionManager;
+use System\Classes\UpdateManager;
 use System\Classes\ApplicationException;
 use October\Rain\Support\ValidationException;
 use Exception;
@@ -46,10 +48,12 @@ class Auth extends Controller
         $this->bodyClass = 'signin';
 
         try {
-            if (post('postback'))
+            if (post('postback')) {
                 return $this->signin_onSubmit();
-            else
+            }
+            else {
                 $this->bodyClass .= ' preload';
+            }
         }
         catch (Exception $ex) {
             Flash::error($ex->getMessage());
@@ -64,8 +68,9 @@ class Auth extends Controller
         ];
 
         $validation = Validator::make(post(), $rules);
-        if ($validation->fails())
+        if ($validation->fails()) {
             throw new ValidationException($validation);
+        }
 
         // Authenticate user
         $user = BackendAuth::authenticate([
@@ -74,7 +79,10 @@ class Auth extends Controller
         ], true);
 
         // Load version updates
-        VersionManager::instance()->updateAll();
+        UpdateManager::instance()->update();
+
+        // Log the sign in event
+        AccessLog::add($user);
 
         // Redirect to the intended page after successful sign in
         return Redirect::intended(Backend::url('backend'));
@@ -95,8 +103,9 @@ class Auth extends Controller
     public function restore()
     {
         try {
-            if (post('postback'))
+            if (post('postback')) {
                 return $this->restore_onSubmit();
+            }
         }
         catch (Exception $ex) {
             Flash::error($ex->getMessage());
@@ -110,8 +119,9 @@ class Auth extends Controller
         ];
 
         $validation = Validator::make(post(), $rules);
-        if ($validation->fails())
+        if ($validation->fails()) {
             throw new ValidationException($validation);
+        }
 
         $user = BackendAuth::findUserByLogin(post('login'));
         if (!$user) {
@@ -130,8 +140,7 @@ class Auth extends Controller
             'link' => $link,
         ];
 
-        Mail::send('backend::mail.restore', $data, function($message) use ($user)
-        {
+        Mail::send('backend::mail.restore', $data, function ($message) use ($user) {
             $message->to($user->email, $user->full_name)->subject(trans('backend::lang.account.password_reset'));
         });
 
@@ -144,11 +153,13 @@ class Auth extends Controller
     public function reset($userId = null, $code = null)
     {
         try {
-            if (post('postback'))
+            if (post('postback')) {
                 return $this->reset_onSubmit();
+            }
 
-            if (!$userId || !$code)
+            if (!$userId || !$code) {
                 throw new ApplicationException(trans('backend::lang.account.reset_error'));
+            }
         }
         catch (Exception $ex) {
             Flash::error($ex->getMessage());
@@ -160,25 +171,29 @@ class Auth extends Controller
 
     public function reset_onSubmit()
     {
-        if (!post('id') || !post('code'))
+        if (!post('id') || !post('code')) {
             throw new ApplicationException(trans('backend::lang.account.reset_error'));
+        }
 
         $rules = [
             'password' => 'required|min:2'
         ];
 
         $validation = Validator::make(post(), $rules);
-        if ($validation->fails())
+        if ($validation->fails()) {
             throw new ValidationException($validation);
+        }
 
         $code = post('code');
         $user = BackendAuth::findUserById(post('id'));
 
-        if (!$user->checkResetPasswordCode($code))
+        if (!$user->checkResetPasswordCode($code)) {
             throw new ApplicationException(trans('backend::lang.account.reset_error'));
+        }
 
-        if (!$user->attemptResetPassword($code, post('password')))
+        if (!$user->attemptResetPassword($code, post('password'))) {
             throw new ApplicationException(trans('backend::lang.account.reset_fail'));
+        }
 
         $user->clearResetPassword();
 

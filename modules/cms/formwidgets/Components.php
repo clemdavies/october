@@ -23,19 +23,21 @@ class Components extends FormWidgetBase
     {
         $components = $this->listComponents();
 
-        return $this->makePartial('formcomponents', ['components'=>$components]);
+        return $this->makePartial('formcomponents', ['components' => $components]);
     }
 
     protected function listComponents()
     {
         $result = [];
 
-        if (!isset($this->model->settings['components']))
+        if (!isset($this->model->settings['components'])) {
             return $result;
+        }
 
         $manager = ComponentManager::instance();
         $manager->listComponents();
-        foreach ($this->model->settings['components'] as $name=>$properties) {
+
+        foreach ($this->model->settings['components'] as $name => $properties) {
             list($name, $alias) = strpos($name, ' ') ? explode(' ', $name) : [$name, $name];
 
             try {
@@ -44,13 +46,18 @@ class Components extends FormWidgetBase
                 $componentObj->alias = $alias;
                 $componentObj->pluginIcon = 'icon-puzzle-piece';
 
+                /*
+                 * Look up the plugin hosting this component
+                 */
                 $plugin = $manager->findComponentPlugin($componentObj);
                 if ($plugin) {
                     $pluginDetails = $plugin->pluginDetails();
-                    if (isset($pluginDetails['icon']))
+                    if (isset($pluginDetails['icon'])) {
                         $componentObj->pluginIcon = $pluginDetails['icon'];
+                    }
                 }
-            } catch (Exception $ex) {
+            }
+            catch (Exception $ex) {
                 $componentObj = new UnknownComponent(null, $properties, $ex->getMessage());
                 $componentObj->alias = $alias;
                 $componentObj->pluginIcon = 'icon-bug';

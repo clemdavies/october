@@ -1,5 +1,5 @@
 /*
- * Tab control. 
+ * Tab control.
  *
  * This plugin is a wrapper for the Twitter Bootstrap Tab component. It provides the following features:
  * - Adding tabs
@@ -55,7 +55,7 @@
  *   preventDefault() method to cancel the action.
  * - afterAllClosed.oc.tab - triggered after all tabs have been closed
  * 
- * Dependences: 
+ * Dependences:
  * - DragScroll (october.dragscroll.js)
  * - Toolbar (october.toolbar.js)
  * - Touchwipe (jquery.touchwipe.min.js)
@@ -139,11 +139,18 @@
         if (!$a.attr('title'))
             $a.attr('title', $a.text())
 
+        var html = $a.html()
+
+        $a.html('')
+        $a.append($('<span class="title"></span>').append($('<span></span>').html(html)))
+
         var pane = $('> .tab-pane', this.$pagesContainer).eq(tabIndex).attr('id', targetId)
-        $(li).append($('<span class="tab-close"><i class="icon-times"></i></span>').click(function(){
+        $(li).append($('<span class="tab-close"><i>&times;</i></span>').click(function(){
             $(this).trigger('close.oc.tab')
             return false
         }))
+
+        pane.data('tab', li)
 
         this.$el.trigger('initTab.oc.tab', [{'pane': pane, 'tab': li}])
     }
@@ -201,8 +208,7 @@
         this.updateClasses()
     }
 
-    Tab.prototype.generateTitleText = function(title, tabIndex)
-    {
+    Tab.prototype.generateTitleText = function(title, tabIndex) {
         var newTitle = title
         if (this.options.titleAsFileNames)
             newTitle = title.replace(/^.*[\\\/]/, '')
@@ -218,7 +224,7 @@
         if (tabIndex == -1)
             return
 
-        var 
+        var
             $tab = $('> li', this.$tabsContainer).eq(tabIndex),
             $pane = $('> div', this.$pagesContainer).eq(tabIndex),
             isActive = $tab.hasClass('active'),
@@ -243,8 +249,7 @@
         if ($('> li > a', this.$tabsContainer).length == 0)
             this.$el.trigger('afterAllClosed.oc.tab')
 
-
-        this.$el.trigger('closed.oc.tab')
+        this.$el.trigger('closed.oc.tab', [$tab])
 
         $(window).trigger('resize')
         this.updateClasses()
@@ -356,7 +361,7 @@
             return
 
         var processedTitle = this.generateTitleText(title, index),
-            $link = $('> li > a', this.$tabsContainer).eq(index)
+            $link = $('> li > a span.title', this.$tabsContainer).eq(index)
 
         $link.attr('title', title)
         $link.text(processedTitle)
@@ -428,7 +433,9 @@
     /*
      * Detect invalid fields, focus the tab
      */
-    $(window).on('ajaxInvalidField', function(ev, element, name){
+    $(window).on('ajaxInvalidField', function(event, element, name, messages, isFirst){
+        if (!isFirst) return
+        event.preventDefault()
         element.closest('[data-control=tab]').ocTab('goToElement', element)
         element.focus()
     })

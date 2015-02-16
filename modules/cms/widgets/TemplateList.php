@@ -46,7 +46,7 @@ class TemplateList extends WidgetBase
     /**
      * @var string Message to display when there are no records in the list.
      */
-    public $noRecordsMessage = 'No records found'; 
+    public $noRecordsMessage = 'No records found';
 
     /**
      * @var string Message to display when the Delete button is clicked.
@@ -57,6 +57,16 @@ class TemplateList extends WidgetBase
      * @var string Specifies the item type.
      */
     public $itemType;
+
+    /**
+     * @var string Extra CSS class name to apply to the control.
+     */
+    public $controlClass = null;
+
+    /**
+     * @var string A list of directories to suppress / hide.
+     */
+    public $suppressDirectories = [];
 
     /*
      * Public methods
@@ -70,15 +80,17 @@ class TemplateList extends WidgetBase
 
         parent::__construct($controller, []);
 
-        if (!Request::isXmlHttpRequest())
+        if (!Request::isXmlHttpRequest()) {
             $this->resetSelection();
+        }
 
         $configFile = 'config_' . snake_case($alias) .'.yaml';
         $config = $this->makeConfig($configFile);
 
-        foreach ($config as $field=>$value) {
-            if (property_exists($this, $field))
+        foreach ($config as $field => $value) {
+            if (property_exists($this, $field)) {
                 $this->$field = $value;
+            }
         }
 
         $this->bindToController();
@@ -124,39 +136,68 @@ class TemplateList extends WidgetBase
         return $this->updateList();
     }
 
-    /*
-     * Methods for the internal use
-     */
-
+    //
+    // Methods for the internal use
+    //
     protected function getData()
     {
-        // Load the data
+        /*
+         * Load the data
+         */
         $items = call_user_func($this->dataSource);
 
         $normalizedItems = [];
-        foreach ($items as $item)
-            $normalizedItems[] = $this->normalizeItem($item);
+        foreach ($items as $item) {
+            if ($this->suppressDirectories) {
+                $fileName = $item->getBaseFileName();
+                $dir = dirname($fileName);
 
-        usort($normalizedItems, function($a, $b) {
-            return strcmp($a->title, $b->title);
+                if (in_array($dir, $this->suppressDirectories)) {
+                    continue;
+                }
+            }
+
+            $normalizedItems[] = $this->normalizeItem($item);
+        }
+
+        usort($normalizedItems, function ($a, $b) {
+            return strcmp($a->fileName, $b->fileName);
         });
 
-        // Apply the search
+        /*
+         * Apply the search
+         */
         $filteredItems = [];
-
         $searchTerm = Str::lower($this->getSearchTerm());
 
         if (strlen($searchTerm)) {
-            $words = explode(' ', $searchTerm);
-
-            foreach ($normalizedItems as $item) {
-                if ($this->itemMatchesSearch($words, $item))
+            /*
+             * Exact
+             */
+            foreach ($normalizedItems as $index => $item) {
+                if ($this->itemContainsWord($searchTerm, $item, true)) {
                     $filteredItems[] = $item;
+                    unset($normalizedItems[$index]);
+                }
             }
-        } else
-            $filteredItems = $normalizedItems;
 
-        // Group the items
+            /*
+             * Fuzzy
+             */
+            $words = explode(' ', $searchTerm);
+            foreach ($normalizedItems as $item) {
+                if ($this->itemMatchesSearch($words, $item)) {
+                    $filteredItems[] = $item;
+                }
+            }
+        }
+        else {
+            $filteredItems = $normalizedItems;
+        }
+
+        /*
+         * Group the items
+         */
         $result = [];
         $foundGroups = [];
         foreach ($filteredItems as $itemData) {
@@ -174,12 +215,15 @@ class TemplateList extends WidgetBase
                 }
 
                 $foundGroups[$group]->items[] = $itemData;
-            } else
+            }
+            else {
                 $result[] = $itemData;
+            }
         }
 
-        foreach ($foundGroups as $group)
+        foreach ($foundGroups as $group) {
             $result[] = $group;
+        }
 
         return $result;
     }
@@ -187,33 +231,36 @@ class TemplateList extends WidgetBase
     protected function normalizeItem($item)
     {
         $description = null;
-        if ($descriptionProperty = $this->descriptionProperty)
+        if ($descriptionProperty = $this->descriptionProperty) {
             $description = $item->$descriptionProperty;
+        }
 
         $descriptions = [];
-        foreach ($this->descriptionProperties as $property=>$title) {
-            if ($item->$property)
+        foreach ($this->descriptionProperties as $property => $title) {
+            if ($item->$property) {
                 $descriptions[$title] = $item->$property;
+            }
         }
 
         $result = [
-            'title' => $this->getItemTitle($item),
-            'fileName' => $item->getFileName(),
-            'description' => $description,
+            'title'        => $this->getItemTitle($item),
+            'fileName'     => $item->getFileName(),
+            'description'  => $description,
             'descriptions' => $descriptions
         ];
 
-        return (object)$result;
+        return (object) $result;
     }
 
     protected function getItemTitle($item)
     {
         $titleProperty = $this->titleProperty;
 
-        if ($titleProperty)
-            return $item->$titleProperty ?: $item->getFileName();
+        if ($titleProperty) {
+            return $item->$titleProperty ?: basename($item->getFileName());
+        }
 
-        return $item->getFileName();
+        return basename($item->getFileName());
     }
 
     protected function setSearchTerm($term)
@@ -232,35 +279,44 @@ class TemplateList extends WidgetBase
         return ['#'.$this->getId('template-list') => $this->makePartial('items', ['items'=>$this->getData()])];
     }
 
-    protected function itemMatchesSearch(&$words, $item)
+    protected function itemMatchesSearch($words, $item)
     {
         foreach ($words as $word) {
             $word = trim($word);
-            if (!strlen($word))
+            if (!strlen($word)) {
                 continue;
+            }
 
-            if (!$this->itemContainsWord($word, $item))
+            if (!$this->itemContainsWord($word, $item)) {
                 return false;
+            }
         }
 
         return true;
     }
 
-    protected function itemContainsWord($word, $item)
+    protected function itemContainsWord($word, $item , $exact = false)
     {
+        $operator = $exact ? 'is' : 'contains';
+
         if (strlen($item->title)) {
-            if (Str::contains(Str::lower($item->title), $word))
+            if (Str::$operator(Str::lower($item->title), $word)) {
                 return true;
-        } else
-            if (Str::contains(Str::lower($item->fileName), $word))
-                return true;
-
-        if (Str::contains(Str::lower($item->description), $word) && strlen($item->description))
+            }
+        }
+        elseif (Str::$operator(Str::lower($item->fileName), $word)) {
             return true;
+        }
 
-        foreach ($item->descriptions as $value) 
-            if (Str::contains(Str::lower($value), $word) && strlen($value))
+        if (Str::$operator(Str::lower($item->description), $word) && strlen($item->description)) {
+            return true;
+        }
+
+        foreach ($item->descriptions as $value) {
+            if (Str::$operator(Str::lower($value), $word) && strlen($value)) {
                 return true;
+            }
+        }
 
         return false;
     }
@@ -268,8 +324,9 @@ class TemplateList extends WidgetBase
     protected function getGroupStatus($group)
     {
         $statuses = $this->getGroupStatuses();
-        if (array_key_exists($group, $statuses))
+        if (array_key_exists($group, $statuses)) {
             return $statuses[$group];
+        }
 
         return false;
     }
@@ -281,12 +338,14 @@ class TemplateList extends WidgetBase
 
     protected function getGroupStatuses()
     {
-        if ($this->groupStatusCache !== false)
+        if ($this->groupStatusCache !== false) {
             return $this->groupStatusCache;
+        }
 
         $groups = $this->getSession($this->getThemeSessionKey('groups'), []);
-        if (!is_array($groups))
+        if (!is_array($groups)) {
             return $this->groupStatusCache = [];
+        }
 
         return $this->groupStatusCache = $groups;
     }
@@ -301,19 +360,21 @@ class TemplateList extends WidgetBase
 
     protected function getSelectedTemplates()
     {
-        if ($this->selectedTemplatesCache !== false)
+        if ($this->selectedTemplatesCache !== false) {
             return $this->selectedTemplatesCache;
+        }
 
         $templates = $this->getSession($this->getThemeSessionKey('selected'), []);
-        if (!is_array($templates))
+        if (!is_array($templates)) {
             return $this->selectedTemplatesCache = [];
+        }
 
         return $this->selectedTemplatesCache = $templates;
     }
 
     protected function extendSelection()
     {
-        $items =Input::get('template', []);
+        $items = Input::get('template', []);
         $currentSelection = $this->getSelectedTemplates();
 
         $this->putSession($this->getThemeSessionKey('selected'), array_merge($currentSelection, $items));
@@ -327,8 +388,9 @@ class TemplateList extends WidgetBase
     protected function isTemplateSelected($item)
     {
         $selectedTemplates = $this->getSelectedTemplates();
-        if (!is_array($selectedTemplates) || !isset($selectedTemplates[$item->fileName]))
+        if (!is_array($selectedTemplates) || !isset($selectedTemplates[$item->fileName])) {
             return false;
+        }
 
         return $selectedTemplates[$item->fileName];
     }

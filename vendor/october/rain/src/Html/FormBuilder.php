@@ -18,7 +18,7 @@ class FormBuilder extends FormBuilderBase
      * The reserved form open attributes.
      * @var array
      */
-    protected $reserved = ['method', 'url', 'route', 'action', 'files', 'request', 'model'];
+    protected $reserved = ['method', 'url', 'route', 'action', 'files', 'request', 'model', 'sessionKey'];
 
     /**
      * The reserved form open attributes.
@@ -64,7 +64,7 @@ class FormBuilder extends FormBuilderBase
         $append = $this->requestHandler($request);
 
         if ($method != 'GET')
-            $append .= $this->sessionKey();
+            $append .= $this->sessionKey(array_get($options, 'sessionKey'));
 
         return parent::open($options) . $append;
     }
@@ -96,11 +96,12 @@ class FormBuilder extends FormBuilderBase
     }
 
     /**
-     * Helper for getting form values.
+     * Helper for getting form values. Tries to find the "old" value (Laravel),
+     * then looks at the form model values, then uses a postback value.
      */
     public function value($name, $value = null)
     {
-        return $this->getValueAttribute($name, $value);
+        return $this->getValueAttribute($name) ?: post($name, $value);
     }
 
     /**
@@ -119,9 +120,12 @@ class FormBuilder extends FormBuilderBase
      * Returns a hidden HTML input, supplying the session key value.
      * @return string
      */
-    protected function sessionKey()
+    protected function sessionKey($sessionKey = null)
     {
-        return $this->hidden('_session_key', post('_session_key', $this->sessionKey));
+        if (!$sessionKey)
+            $sessionKey = post('_session_key', $this->sessionKey);
+
+        return $this->hidden('_session_key', $sessionKey);
     }
 
     /**

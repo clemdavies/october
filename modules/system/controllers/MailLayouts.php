@@ -9,6 +9,7 @@ use Redirect;
 use BackendMenu;
 use Backend\Classes\Controller;
 use System\Classes\ApplicationException;
+use System\Classes\SettingsManager;
 use Exception;
 
 /**
@@ -16,11 +17,9 @@ use Exception;
  *
  * @package october\system
  * @author Alexey Bobkov, Samuel Georges
- *
  */
 class MailLayouts extends Controller
 {
-
     public $implement = [
         'Backend.Behaviors.FormController',
     ];
@@ -34,6 +33,6 @@ class MailLayouts extends Controller
         parent::__construct();
 
         BackendMenu::setContext('October.System', 'system', 'settings');
+        SettingsManager::setContext('October.System', 'mail_templates');
     }
-
 }

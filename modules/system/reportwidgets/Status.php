@@ -2,6 +2,7 @@
 
 use System\Models\Parameters;
 use System\Classes\UpdateManager;
+use Cms\Models\MaintenanceSettings;
 use Backend\Classes\ReportWidgetBase;
 use Exception;
 
@@ -32,11 +33,11 @@ class Status extends ReportWidgetBase
     {
         return [
             'title' => [
-                'title'             => 'Widget title',
-                'default'           => 'System status',
+                'title'             => 'backend::lang.dashboard.widget_title_label',
+                'default'           => 'backend::lang.dashboard.status.widget_title_default',
                 'type'              => 'string',
                 'validationPattern' => '^.+$',
-                'validationMessage' => 'The Widget Title is required.'
+                'validationMessage' => 'backend::lang.dashboard.widget_title_error',
             ]
         ];
     }
@@ -44,6 +45,8 @@ class Status extends ReportWidgetBase
     protected function loadData()
     {
         $manager = UpdateManager::instance();
+        $this->vars['inMaintenance'] = MaintenanceSettings::get('is_enabled');
+        $this->vars['showUpdates'] = $this->controller->user->hasAccess('system.manage_updates');
         $this->vars['updates'] = $manager->check();
     }
 }

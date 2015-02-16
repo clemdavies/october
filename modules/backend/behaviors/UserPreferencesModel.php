@@ -35,21 +35,12 @@ class UserPreferencesModel extends SettingsModel
      */
     public function instance()
     {
-        if (isset(self::$instances[$this->recordCode]))
+        if (isset(self::$instances[$this->recordCode])) {
             return self::$instances[$this->recordCode];
+        }
 
-        $item = UserPreferences::forUser();
-        $item = $item->scopeFindRecord($this->model, $this->recordCode, $item->userContext)->first();
-
-        if (!$item) {
+        if (!$item = $this->getSettingsRecord()) {
             $this->model->initSettingsData();
-
-            if (method_exists($this->model, 'forceSave'))
-                $this->model->forceSave();
-            else
-                $this->model->save();
-
-            $this->model->reload();
             $item = $this->model;
         }
 
@@ -61,7 +52,21 @@ class UserPreferencesModel extends SettingsModel
      */
     public function isConfigured()
     {
-        return UserPreferences::forUser()->findRecord($this->recordCode, $item->userContext)->count() > 0;
+        return $this->getSettingsRecord() !== null;
+    }
+
+    /**
+     * Returns the raw Model record that stores the settings.
+     * @return Model
+     */
+    public function getSettingsRecord()
+    {
+        $item = UserPreferences::forUser();
+        $record = $item->scopeFindRecord($this->model, $this->recordCode, $item->userContext)
+            ->remember(1440, $this->getCacheKey())
+            ->first();
+
+        return $record ?: null;
     }
 
     /**
@@ -70,9 +75,6 @@ class UserPreferencesModel extends SettingsModel
      */
     public function beforeModelSave()
     {
-        // Purge the field values from the attributes
-        $this->model->attributes = array_diff_key($this->model->attributes, $this->fieldValues);
-
         $preferences = UserPreferences::forUser();
         list($namespace, $group, $item) = $preferences->parseKey($this->recordCode);
         $this->model->item = $item;
@@ -80,22 +82,32 @@ class UserPreferencesModel extends SettingsModel
         $this->model->namespace = $namespace;
         $this->model->user_id = $preferences->userContext->id;
 
-        if ($this->fieldValues)
+        if ($this->fieldValues) {
             $this->model->value = $this->fieldValues;
+        }
     }
 
     /**
      * Checks if a key is legitimate or should be added to
      * the field value collection
      */
-    private function isKeyAllowed($key)
+    protected function isKeyAllowed($key)
     {
         /*
          * Let the core columns through
          */
-        if ($key == 'namespace' || $key == 'group')
+        if ($key == 'namespace' || $key == 'group') {
             return true;
+        }
 
         return parent::isKeyAllowed($key);
     }
-} 
+
+    /**
+     * Returns a cache key for this record.
+     */
+    protected function getCacheKey()
+    {
+        return 'backend::userpreferences.'.$this->recordCode;
+    }
+}

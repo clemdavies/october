@@ -23,8 +23,8 @@ class User extends UserBase
     public $rules = [
         'login' => 'required|between:2,24|unique:backend_users',
         'email' => 'required|between:3,64|email|unique:backend_users',
-        'password' => 'required:create|between:2,32|confirmed',
-        'password_confirmation' => 'required_with:password|between:2,32'
+        'password' => 'required:create|between:4,64|confirmed',
+        'password_confirmation' => 'required_with:password|between:4,64'
     ];
 
     /**
@@ -43,7 +43,10 @@ class User extends UserBase
      */
     protected $purgeable = ['password_confirmation', 'send_invite'];
 
-    protected static $loginAttribute = 'login';
+    /**
+     * @var string Login attribute
+     */
+    public static $loginAttribute = 'login';
 
     /**
      * @return string Returns the user's full name.
@@ -63,8 +66,9 @@ class User extends UserBase
         // return parent::getPersistCode();
 
         // Option B:
-        if (!$this->persist_code)
+        if (!$this->persist_code) {
             return parent::getPersistCode();
+        }
 
         return $this->persist_code;
     }
@@ -74,18 +78,28 @@ class User extends UserBase
      */
     public function getAvatarThumb($size = 25, $default = null)
     {
-        if ($this->avatar)
+        if (!$default) {
+            $default = 'mm'; // Mystery man
+        }
+
+        if ($this->avatar) {
             return $this->avatar->getThumb($size, $size);
-        else
-            return '//www.gravatar.com/avatar/' . md5(strtolower(trim($this->email))) . '?s='.$size.'&d='.urlencode($default);
+        }
+        else {
+            return '//www.gravatar.com/avatar/'.
+                md5(strtolower(trim($this->email))) .
+                '?s='. $size .
+                '&d='. urlencode($default);
+        }
     }
 
     public function afterCreate()
     {
         $this->restorePurgedValues();
 
-        if ($this->send_invite)
+        if ($this->send_invite) {
             $this->sendInvitation();
+        }
     }
 
     public function sendInvitation()
@@ -97,10 +111,17 @@ class User extends UserBase
             'link' => Backend::url('backend'),
         ];
 
-        Mail::send('backend::mail.invite', $data, function($message)
-        {
+        Mail::send('backend::mail.invite', $data, function ($message) {
             $message->to($this->email, $this->full_name);
         });
     }
 
+    public function getGroupsOptions()
+    {
+        $result = [];
+        foreach (UserGroup::all() as $group) {
+            $result[$group->id] = [$group->name, $group->description];
+        }
+        return $result;
+    }
 }

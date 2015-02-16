@@ -1,11 +1,12 @@
 <?php namespace Backend\Controllers;
 
-use Lang;
 use Backend;
 use Redirect;
 use BackendMenu;
 use BackendAuth;
+use Backend\Models\UserGroup;
 use Backend\Classes\Controller;
+use System\Classes\SettingsManager;
 
 /**
  * Backend user controller
@@ -32,10 +33,12 @@ class Users extends Controller
     {
         parent::__construct();
 
-        if ($this->action == 'myaccount')
+        if ($this->action == 'myaccount') {
             $this->requiredPermissions = null;
+        }
 
         BackendMenu::setContext('October.System', 'system', 'users');
+        SettingsManager::setContext('October.System', 'administrators');
     }
 
     /**
@@ -44,10 +47,11 @@ class Users extends Controller
     public function update($recordId, $context = null)
     {
         // Users cannot edit themselves, only use My Settings
-        if ($context != 'myaccount' && $recordId == $this->user->id)
+        if ($context != 'myaccount' && $recordId == $this->user->id) {
             return Redirect::to(Backend::url('backend/users/myaccount'));
+        }
 
-        return $this->getClassExtension('Backend.Behaviors.FormController')->update($recordId, $context);
+        return $this->asExtension('FormController')->update($recordId, $context);
     }
 
     /**
@@ -55,8 +59,9 @@ class Users extends Controller
      */
     public function myaccount()
     {
-        BackendMenu::setContextSideMenu('mysettings');
-        $this->pageTitle = Lang::get('backend::lang.myaccount.menu_label');
+        SettingsManager::setContext('October.Backend', 'myaccount');
+
+        $this->pageTitle = 'backend::lang.myaccount.menu_label';
         return $this->update($this->user->id, 'myaccount');
     }
 
@@ -65,26 +70,29 @@ class Users extends Controller
      */
     public function myaccount_onSave()
     {
-        $result = $this->getClassExtension('Backend.Behaviors.FormController')->update_onSave($this->user->id, 'myaccount');
+        $result = $this->asExtension('FormController')->update_onSave($this->user->id, 'myaccount');
 
         /*
          * If the password or login name has been updated, reauthenticate the user
          */
         $loginChanged = $this->user->login != post('User[login]');
         $passwordChanged = strlen(post('User[password]'));
-        if ($loginChanged || $passwordChanged)
+        if ($loginChanged || $passwordChanged) {
             BackendAuth::login($this->user->reload(), true);
+        }
 
         return $result;
     }
 
     /**
      * Add available permission fields to the User form.
+     * Mark default groups as checked for new Users.
      */
-    protected function formExtendFields($host)
+    protected function formExtendFields($form)
     {
-        if ($host->getContext() == 'myaccount')
+        if ($form->getContext() == 'myaccount') {
             return;
+        }
 
         $permissionFields = [];
         foreach (BackendAuth::listPermissions() as $permission) {
@@ -95,9 +103,9 @@ class Users extends Controller
                 'comment' => $permission->comment,
                 'type' => 'balloon-selector',
                 'options' => [
-                    1 => 'Allow',
-                    0 => 'Inherit',
-                    -1 => 'Deny',
+                    1 => 'backend::lang.user.allow',
+                    0 => 'backend::lang.user.inherit',
+                    -1 => 'backend::lang.user.deny',
                 ],
                 'attributes' => [
                     'data-trigger' => "input[name='User[permissions][superuser]']",
@@ -107,12 +115,23 @@ class Users extends Controller
                 'span' => 'auto',
             ];
 
-            if (isset($permission->tab))
+            if (isset($permission->tab)) {
                 $fieldConfig['tab'] = $permission->tab;
+            }
 
             $permissionFields[$fieldName] = $fieldConfig;
         }
 
-        $host->addTabFields($permissionFields);
+        $form->addTabFields($permissionFields);
+
+        /*
+         * Mark default groups
+         */
+        if (!$form->model->exists) {
+            $defaultGroupIds = UserGroup::where('is_new_user_default', true)->lists('id');
+
+            $groupField = $form->getField('groups');
+            $groupField->value = $defaultGroupIds;
+        }
     }
 }

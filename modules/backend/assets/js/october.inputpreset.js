@@ -86,6 +86,9 @@
         'ظ':'th', 'ع':'aa', 'غ':'gh', 'ف':'f', 'ق':'k', 'ك':'k', 'ل':'l', 'م':'m',
         'ن':'n', 'ه':'h', 'و':'o', 'ي':'y'
     },
+    PERSIAN_MAP = {
+        'آ':'a', 'ا':'a', 'پ':'p', 'چ':'ch', 'ژ':'zh', 'ک':'k', 'گ':'gh', 'ی':'y'
+    },
     LITHUANIAN_MAP = {
         'ą':'a', 'č':'c', 'ę':'e', 'ė':'e', 'į':'i', 'š':'s', 'ų':'u', 'ū':'u',
         'ž':'z',
@@ -111,6 +114,7 @@
         POLISH_MAP,
         LATVIAN_MAP,
         ARABIC_MAP,
+        PERSIAN_MAP,
         LITHUANIAN_MAP,
         SERBIAN_MAP,
         AZERBAIJANI_MAP
@@ -121,33 +125,6 @@
         "in", "into", "like", "of", "off", "on", "onto", "per", "since",
         "than", "the", "this", "that", "to", "up", "via", "with"
     ]
-
-    var InputPreset = function (element, options) {
-        var $el = this.$el = $(element);
-        this.options = options || {};
-        this.cancelled = false;
-
-        // Do not update the element if it already has a value
-        if ($el.val().length)
-            return
-
-        var parent = options.inputPresetClosestParent !== undefined ?
-                $el.closest(options.inputPresetClosestParent) :
-                undefined,
-            self = this;
-
-        this.$src = $(options.inputPreset, parent),
-        this.$src.on('keyup', function() {
-            if (self.cancelled)
-                return;
-
-            $el.val(self.formatValue())
-        })
-
-        this.$el.on('change', function() {
-            self.cancelled = true
-        })
-    }
 
     var Downcoder = {
         Initialize: function() {
@@ -214,21 +191,30 @@
         this.options = options || {}
         this.cancelled = false
 
-        // Do not update the element if it already has a value
-        if ($el.val().length)
-            return
-
         var parent = options.inputPresetClosestParent !== undefined ?
                 $el.closest(options.inputPresetClosestParent) :
                 undefined,
-            self = this
+            self = this,
+            prefix = ''
+
+        if (options.inputPresetPrefixInput !== undefined)
+            prefix = $(options.inputPresetPrefixInput, parent).val()
+
+        if (prefix === undefined)
+            prefix = ''
+
+        // Do not update the element if it already has a value and the value doesn't match the prefix
+        if ($el.val().length && $el.val() != prefix)
+            return
+
+        $el.val(prefix)
 
         this.$src = $(options.inputPreset, parent),
         this.$src.on('keyup', function() {
             if (self.cancelled)
                 return
 
-            $el.val(self.formatValue())
+            $el.val(prefix + self.formatValue())
         })
 
         this.$el.on('change', function() {
@@ -252,7 +238,8 @@
     InputPreset.DEFAULTS = {
         inputPreset: '',
         inputPresetType: 'file',
-        inputPresetClosestParent: undefined
+        inputPresetClosestParent: undefined,
+        inputPresetPrefixInput: undefined
     }
 
     // INPUT CONVERTER PLUGIN DEFINITION

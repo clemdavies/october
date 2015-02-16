@@ -1,7 +1,7 @@
 /*
  * Sortable plugin, a forked version of johnny's sortable plugin. 
  *
- * Forked from: https://github.com/johnny/jquery-sortable/tree/271cd2c742439842000e6f92d4dae96bb8dcd595
+ * Forked from: https://github.com/johnny/jquery-sortable/tree/1563f32858cfe250051ad0a573425569c49d631f
  *
  * Note: Consider using october.simplelist.js with "is-sortable" class.
  * 
@@ -31,7 +31,6 @@
 +function ($) { "use strict";
 
     var eventNames,
-        isTouch = 'ontouchstart' in window,
         cursorAdjustment,
         containerDefaults = {
             drag:     true,  // Items can be dragged from this container
@@ -55,6 +54,8 @@
             handle: "",
             // The exact css path between the item and its subcontainers
             itemPath: "",
+            // Use animation when an item is removed or inserted into the tree
+            useAnimation : false,
             // The css selector of the items
             itemSelector: "li",
             // Check if the dragged item may be inside the container.
@@ -66,6 +67,10 @@
             // Executed before onDrop if placeholder is detached.
             // This happens if pullPlaceholder is set to false and the drop occurs outside a container.
             onCancel: function ($item, container, _super, event) {
+            },
+
+            tweakCursorAdjustment: function(adjustment) {
+                return adjustment
             },
             // Called after the drag has been started,
             // that is the mouse button is beeing held down and
@@ -87,10 +92,16 @@
                     cursorAdjustment = null
                 }
 
+                cursorAdjustment = this.tweakCursorAdjustment(cursorAdjustment)
+
                 $item.css({
                     height: $item.height(),
                     width: $item.width()
                 })
+
+                if (this.useAnimation)
+                    $item.data('oc.animated', true)
+
                 $item.addClass("dragged")
                 $("body").addClass("dragging")
             },
@@ -109,10 +120,15 @@
                     $item.css(position)
                 }
             },
-            // Called when the mouse button is beeing released
+            // Called when the mouse button is being released
             onDrop: function ($item, container, _super, event) {
                 $item.removeClass("dragged").removeAttr("style")
                 $("body").removeClass("dragging")
+
+                if ($item.data('oc.animated')) {
+                    $item.hide()
+                    $item.slideDown(200)
+                }
             },
             // Called on mousedown. If falsy value is returned, the dragging will not start.
             onMousedown: function ($item, _super, event) {
@@ -157,23 +173,13 @@
             top: 0,
             bottom: 0,
             right: 0
-        }
-
-    if (isTouch) {
+        },
         eventNames = {
-            start: "touchstart",
-            drop: "touchend",
-            drag: "touchmove",
+            start: "touchstart.sortable mousedown.sortable",
+            drop: "touchend.sortable touchcancel.sortable mouseup.sortable",
+            drag: "touchmove.sortable mousemove.sortable",
             scroll: "scroll.sortable"
         }
-    } else {
-        eventNames = {
-            start: "mousedown.sortable",
-            drop: "mouseup.sortable",
-            drag: "mousemove.sortable",
-            scroll: "scroll.sortable"
-        }
-    }
 
     /*
      * a is Array [left, right, top, bottom]
@@ -299,8 +305,8 @@
                                 groupDefaults.onDrag,
                                 e)
 
-            var x = (isTouch) ? e.originalEvent.touches[0].pageX : e.pageX,
-                y = (isTouch) ? e.originalEvent.touches[0].pageY : e.pageY,
+            var x = e.pageX || e.originalEvent.pageX,
+                y = e.pageY || e.originalEvent.pageY,
                 box = this.sameResultBox,
                 t = this.options.tolerance
 
@@ -400,17 +406,7 @@
             return this.offsetParent
         },
         setPointer: function (e) {
-            if (isTouch) {
-                var pointer = {
-                    left: e.originalEvent.touches[0].pageX,
-                    top: e.originalEvent.touches[0].pageY
-                }
-            } else {
-                var pointer = {
-                    left: e.pageX,
-                    top: e.pageY
-                }
-            }
+            var pointer = this.getPointer(e)
 
             if (this.$getOffsetParent()) {
                 var relativePointer = getRelativePosition(pointer, this.$getOffsetParent())
@@ -422,17 +418,16 @@
             this.pointer = pointer
         },
         distanceMet: function (e) {
-            if (isTouch) {
-                return (Math.max(
-                        Math.abs(this.pointer.left - e.originalEvent.touches[0].pageX),
-                        Math.abs(this.pointer.top - e.originalEvent.touches[0].pageY)
-                    ) >= this.options.distance)
-
-            } else {
-                return (Math.max(
-                        Math.abs(this.pointer.left - e.pageX),
-                        Math.abs(this.pointer.top - e.pageY)
-                    ) >= this.options.distance)
+            var currentPointer = this.getPointer(e)
+            return (Math.max(
+                Math.abs(this.pointer.left - currentPointer.left),
+                Math.abs(this.pointer.top - currentPointer.top)
+            ) >= this.options.distance)
+        },
+        getPointer: function(e) {
+            return {
+                left: e.pageX || e.originalEvent.pageX,
+                top: e.pageY || e.originalEvent.pageY
             }
         },
         setupDelayTimer: function () {

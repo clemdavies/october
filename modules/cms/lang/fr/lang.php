@@ -15,12 +15,18 @@ return [
     'theme' => [
         'active' => [
             'not_set' => "Aucun thème activé.",
+            'not_found' => "Thème activé introuvable.",
         ],
         'edit' => [
             'not_set' => "Le thème d'édition n'est pas activé.",
             'not_found' => "Thème d'édition introuvable.",
             'not_match' => "L'objet auquel vous essayez d'accéder n'appartient pas au thème en cours d'édition. Veuillez recharger la page."
-        ]
+        ],
+        'settings_menu' => 'Front-end theme',
+        'settings_menu_description' => 'Aperçu des thèmes installés et sélection du thème actif.',
+        'find_more_themes' => 'Trouvez plus de thèmes sur le marketplace de OctoberCMS.',
+        'activate_button' => 'Activer',
+        'active_button' => 'Activer',
     ],
     'page' => [
         'not_found' => [
@@ -34,7 +40,7 @@ return [
         'menu_label' => 'Pages',
         'no_list_records' => 'Aucune page trouvée',
         'new' => 'Nouvelle page',
-        'invalid_url' => 'Format d\'URL invalide. L\'URL doit commencer par un / et peut contenit des chiffres, des lettres et les symboles suivants: _-[]:?|/+*',
+        'invalid_url' => 'Format d\'URL invalide. L\'URL doit commencer par un / et peut contenit des chiffres, des lettres et les symboles suivants: ._-[]:?|/+*^$',
         'delete_confirm_multiple' => 'Voulez-vous vraiment supprimer les pages sélectionnées ?',
         'delete_confirm_single' => 'Voulez-vous vraiment supprimer cette page ?',
         'no_layout' => '-- aucun layout --'
@@ -67,9 +73,6 @@ return [
     'ajax_handler' => [
         'invalid_name' => "Nom de gestionnaire AJAX invalide: :name.",
         'not_found' => "Le gestionnaire AJAX ':name' est introuvable.",
-    ],
-    'combiner' => [
-        'not_found' => "Le fichier combiner ':name' est introuvable.",
     ],
     'cms' => [
         'menu_label' => "CMS"

@@ -1,8 +1,8 @@
 <?php namespace Backend\Controllers;
 
-use Lang;
 use BackendMenu;
 use Backend\Classes\Controller;
+use System\Classes\SettingsManager;
 use Backend\Models\EditorPreferences as EditorPreferencesModel;
 
 /**
@@ -14,7 +14,6 @@ use Backend\Models\EditorPreferences as EditorPreferencesModel;
  */
 class EditorPreferences extends Controller
 {
-
     public $implement = [
         'Backend.Behaviors.FormController',
     ];
@@ -34,6 +33,7 @@ class EditorPreferences extends Controller
         $this->addJs('/modules/backend/assets/js/editorpreferences/editorpreferences.js', 'core');
 
         BackendMenu::setContext('October.System', 'system', 'mysettings');
+        SettingsManager::setContext('October.Backend', 'editor');
     }
 
     public function index()
@@ -53,13 +53,13 @@ class EditorPreferences extends Controller
         $this->vars['language'] = 'css';
         $this->vars['margin'] = 0;
 
-        $this->getClassExtension('Backend.Behaviors.FormController')->update();
-        $this->pageTitle = Lang::get('backend::lang.editor.menu_label');
+        $this->asExtension('FormController')->update();
+        $this->pageTitle = 'backend::lang.editor.menu_label';
     }
 
     public function index_onSave()
     {
-        return $this->getClassExtension('Backend.Behaviors.FormController')->update_onSave();
+        return $this->asExtension('FormController')->update_onSave();
     }
 
     public function formFindModelObject()

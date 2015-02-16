@@ -1,19 +1,22 @@
 /*
  * The trigger API.
  *
- * The API allows to change elements' visibility or status (enabled/disabled) basing on 
+ * The API allows to change elements' visibility or status (enabled/disabled) basing on
  * other elements' statuses. Example: enable a button if any checkbox inside another
  * element is checked.
  * 
  * Supported data attributes:
- * - data-trigger-type, values: display, hide, enable, disable
+ * - data-trigger-type, values: display, hide, enable, disable, empty
  * - data-trigger: a CSS selector for elements that trigger the action (checkboxes)
- * - data-trigger-condition, values: checked (more conditions to add later) - determines the condition the elements
- *   specified in the data-trigger should satisfy in order the condition to be considered as "true".
+ * - data-trigger-condition, values:
+ *       - checked: determines the condition the elements specified in the data-trigger
+ *                  should satisfy in order the condition to be considered as "true".
+ *       - value[somevalue]: determines if the value of data-trigger equals the specified value (somevalue)
+ *                           the condition is considered "true".
  *
- * Example: <input type="button" class="btn disabled" 
- *             data-trigger-type="enable" 
- *             data-trigger="#cblist input[type=checkbox]" 
+ * Example: <input type="button" class="btn disabled"
+ *             data-trigger-type="enable"
+ *             data-trigger="#cblist input[type=checkbox]"
  *             data-trigger-condition="checked" ... >
  *
  * Supported events:
@@ -28,7 +31,7 @@
     var TriggerOn = function (element, options) {
 
         var $el = this.$el = $(element);
-            
+
         this.options = options || {};
 
         if (this.options.triggerCondition === false)
@@ -40,10 +43,20 @@
         if (this.options.triggerType === false)
             throw new Error('Trigger type is not specified.')
 
-        if (this.options.triggerCondition == 'checked')
+        this.triggerCondition = this.options.triggerCondition
+
+        if (this.options.triggerCondition.indexOf('value') == 0) {
+            var match = this.options.triggerCondition.match(/[^[\]]+(?=])/g)
+            if (match) {
+                this.triggerConditionValue = match
+                this.triggerCondition = 'value'
+            }
+        }
+
+        if (this.triggerCondition == 'checked' || this.triggerCondition == 'value')
             $(document).on('change', this.options.trigger, $.proxy(this.onConditionChanged, this))
 
-        var self = this;
+        var self = this
         $el.on('oc.triggerOn.update', function(e){
             e.stopPropagation()
             self.onConditionChanged()
@@ -53,8 +66,12 @@
     }
 
     TriggerOn.prototype.onConditionChanged = function() {
-        if (this.options.triggerCondition == 'checked')
-            this.updateTarget($(this.options.trigger + ':checked').length > 0);
+        if (this.triggerCondition == 'checked') {
+            this.updateTarget($(this.options.trigger + ':checked').length > 0)
+        }
+        else if (this.triggerCondition == 'value') {
+            this.updateTarget($(this.options.trigger).val() == this.triggerConditionValue)
+        }
     }
 
     TriggerOn.prototype.updateTarget = function(status) {
@@ -66,6 +83,8 @@
             this.$el.prop('disabled', !status).trigger('disable', [!status]).toggleClass('control-disabled', !status)
         else if (this.options.triggerType == 'disable')
             this.$el.prop('disabled', status).trigger('disable', [status]).toggleClass('control-disabled', status)
+        else if (this.options.triggerType == 'empty' && status)
+            this.$el.trigger('empty').val('')
 
         if (this.options.triggerType == 'display' || this.options.triggerType == 'hide')
             this.fixButtonClasses()
@@ -114,7 +133,7 @@
     // TRIGGERON DATA-API
     // ===============
 
-    $(document).ready(function(){
+    $(document).render(function(){
         $('[data-trigger]').triggerOn()
     })
 

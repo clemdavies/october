@@ -1,5 +1,7 @@
 <?php namespace System\Behaviors;
 
+use Cache;
+use DbDongle;
 use System\Classes\ModelBehavior;
 use System\Classes\ApplicationException;
 
@@ -8,7 +10,7 @@ use System\Classes\ApplicationException;
  *
  * Usage:
  *
- * In the model class definition: 
+ * In the model class definition:
  *
  *   public $implement = ['System.Behaviors.SettingsModel'];
  *   public $settingsCode = 'author_plugin_code';
@@ -54,7 +56,9 @@ class SettingsModel extends ModelBehavior
          */
         $this->model->bindEvent('model.afterFetch', [$this, 'afterModelFetch']);
         $this->model->bindEvent('model.beforeSave', [$this, 'beforeModelSave']);
-        $this->model->bindEvent('model.setAttribute', [$this, 'setModelAttribute']);
+        $this->model->bindEvent('model.afterSave', [$this, 'afterModelSave']);
+        $this->model->bindEvent('model.setAttribute', [$this, 'setSettingsValue']);
+        $this->model->bindEvent('model.saveInternal', [$this, 'saveModelInternal']);
 
         /*
          * Parse the config
@@ -68,20 +72,12 @@ class SettingsModel extends ModelBehavior
      */
     public function instance()
     {
-        if (isset(self::$instances[$this->recordCode]))
+        if (isset(self::$instances[$this->recordCode])) {
             return self::$instances[$this->recordCode];
+        }
 
-        $item = $this->model->where('item', $this->recordCode)->first();
-
-        if (!$item) {
+        if (!$item = $this->getSettingsRecord()) {
             $this->model->initSettingsData();
-
-            if (method_exists($this->model, 'forceSave'))
-                $this->model->forceSave();
-            else
-                $this->model->save();
-
-            $this->model->reload();
             $item = $this->model;
         }
 
@@ -89,11 +85,37 @@ class SettingsModel extends ModelBehavior
     }
 
     /**
+     * Reset the settings to their defaults, this will delete the record model
+     */
+    public function resetDefault()
+    {
+        if ($record = $this->getSettingsRecord()) {
+            $record->delete();
+            unset(self::$instances[$this->recordCode]);
+            Cache::forget($this->getCacheKey());
+        }
+    }
+
+    /**
      * Checks if the model has been set up previously, intended as a static method
      */
     public function isConfigured()
     {
-        return $this->model->where('item', $this->recordCode)->count() > 0;
+        return DbDongle::hasDatabase() && $this->getSettingsRecord() !== null;
+    }
+
+    /**
+     * Returns the raw Model record that stores the settings.
+     * @return Model
+     */
+    public function getSettingsRecord()
+    {
+        $record = $this->model
+            ->where('item', $this->recordCode)
+            ->remember(1440, $this->getCacheKey())
+            ->first();
+
+        return $record ?: null;
     }
 
     /**
@@ -107,28 +129,43 @@ class SettingsModel extends ModelBehavior
     }
 
     /**
-     * Helper for getValue, intended as a static method
+     * Helper for getSettingsValue, intended as a static method
      */
     public function get($key, $default = null)
     {
-        return $this->instance()->getValue($key, $default);
+        return $this->instance()->getSettingsValue($key, $default);
     }
 
     /**
      * Get a single setting value, or return a default value
      */
-    public function getValue($key, $default = null)
+    public function getSettingsValue($key, $default = null)
     {
-        if (array_key_exists($key, $this->fieldValues))
+        if (array_key_exists($key, $this->fieldValues)) {
             return $this->fieldValues[$key];
+        }
 
         return $default;
     }
 
     /**
+     * Set a single setting value, if allowed.
+     */
+    public function setSettingsValue($key, $value)
+    {
+        if ($this->isKeyAllowed($key)) {
+            return;
+        }
+
+        $this->fieldValues[$key] = $value;
+    }
+
+    /**
      * Default values to set for this model, override
      */
-    public function initSettingsData(){}
+    public function initSettingsData()
+    {
+    }
 
     /**
      * Populate the field values from the database record.
@@ -140,47 +177,55 @@ class SettingsModel extends ModelBehavior
     }
 
     /**
+     * Internal save method for the model
+     * @return void
+     */
+    public function saveModelInternal()
+    {
+        // Purge the field values from the attributes
+        $this->model->attributes = array_diff_key($this->model->attributes, $this->fieldValues);
+    }
+
+    /**
      * Before the model is saved, ensure the record code is set
      * and the jsonable field values
      */
     public function beforeModelSave()
     {
-        // Purge the field values from the attributes
-        $this->model->attributes = array_diff_key($this->model->attributes, $this->fieldValues);
-
         $this->model->item = $this->recordCode;
-        if ($this->fieldValues)
+        if ($this->fieldValues) {
             $this->model->value = $this->fieldValues;
+        }
     }
 
     /**
-     * Adulterate the model setter to use our field values instead.
+     * After the model is saved, clear the cached query entry.
+     * @return void
      */
-    public function setModelAttribute($key, $value)
+    public function afterModelSave()
     {
-        if ($this->isKeyAllowed($key))
-            return;
-
-        $this->fieldValues[$key] = $value;
+        Cache::forget($this->getCacheKey());
     }
 
     /**
      * Checks if a key is legitimate or should be added to
      * the field value collection
      */
-    private function isKeyAllowed($key)
+    protected function isKeyAllowed($key)
     {
         /*
          * Let the core columns through
          */
-        if ($key == 'id' || $key == 'value' || $key == 'item')
+        if ($key == 'id' || $key == 'value' || $key == 'item') {
             return true;
+        }
 
         /*
          * Let relations through
          */
-        if ($this->model->hasRelation($key))
+        if ($this->model->hasRelation($key)) {
             return true;
+        }
 
         return false;
     }
@@ -192,4 +237,12 @@ class SettingsModel extends ModelBehavior
     {
         return $this->fieldConfig;
     }
-} 
+
+    /**
+     * Returns a cache key for this record.
+     */
+    protected function getCacheKey()
+    {
+        return 'system::settings.'.$this->recordCode;
+    }
+}

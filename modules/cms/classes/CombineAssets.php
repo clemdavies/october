@@ -14,7 +14,7 @@ use Assetic\Asset\AssetCache;
 use Assetic\Cache\FilesystemCache;
 
 /**
- * Class used for combining JavaScript and StyleSheet 
+ * Class used for combining JavaScript and StyleSheet
  * files.
  *
  * @package october\system
@@ -31,7 +31,7 @@ class CombineAssets
      * @var array A list of known JavaScript extensions.
      */
     protected static $jsExtensions = ['js'];
-    
+
     /**
      * @var array A list of known StyleSheet extensions.
      */
@@ -113,7 +113,7 @@ class CombineAssets
     }
 
     /**
-     * Combines asset file references of a single type to produce 
+     * Combines asset file references of a single type to produce
      * a URL reference to the combined contents.
      * @var array List of asset files.
      * @var string File extension, used for aesthetic purposes only.
@@ -342,7 +342,7 @@ class CombineAssets
     protected function putCacheIndex($cacheId)
     {
         $index = [];
-        
+
         if (Cache::has('combiner.index'))
             $index = unserialize(Cache::get('combiner.index'));
 
@@ -364,7 +364,7 @@ class CombineAssets
     public function registerFilter($extension, $filter)
     {
         $extension = strtolower($extension);
-        
+
         if (!isset($this->filters[$extension]))
             $this->filters[$extension] = [];
 

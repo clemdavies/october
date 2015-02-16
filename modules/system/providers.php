@@ -18,6 +18,7 @@ return [
     'Illuminate\Foundation\Providers\OptimizeServiceProvider',
     'Illuminate\Pagination\PaginationServiceProvider',
     'Illuminate\Queue\QueueServiceProvider',
+    'Illuminate\Redis\RedisServiceProvider',
     'Illuminate\Remote\RemoteServiceProvider',
     'Illuminate\Database\SeedServiceProvider',
     'Illuminate\Foundation\Providers\ServerServiceProvider',
@@ -38,5 +39,10 @@ return [
     'October\Rain\Support\Scaffold\ScaffoldServiceProvider',
     'October\Rain\Support\FlashServiceProvider',
     'October\Rain\Mail\MailServiceProvider',
+
+    /*
+     * Vendor providers
+     */
+    'Indatus\Dispatcher\ServiceProvider',
 
 ];

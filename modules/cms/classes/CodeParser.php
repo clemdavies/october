@@ -17,22 +17,22 @@ class CodeParser
     /**
      * @var \Cms\Classes\CmsCompoundObject A reference to the CMS object being parsed.
      */
-    private $object;
+    protected $object;
 
     /**
      * @var string Contains a path to the CMS object's file being parsed.
      */
-    private $filePath;
+    protected $filePath;
 
     /**
      * @var mixed The internal cache, keeps parsed object information during a request.
      */
-    static private $cache = [];
+    static protected $cache = [];
 
     /**
      * @var string Key for the parsed PHP file information cache.
      */
-    private $dataCacheKey = 'cms-php-file-data';
+    protected $dataCacheKey = 'cms-php-file-data';
 
     /**
      * Creates the class instance
@@ -99,13 +99,15 @@ class CodeParser
         $body = preg_replace($pattern, '', $body);
 
         $parentClass = $this->object->getCodeClassParent();
-        if ($parentClass !== null)
+        if ($parentClass !== null) {
             $parentClass = ' extends '.$parentClass;
+        }
 
         $fileContents = '<?php '.PHP_EOL;
 
-        foreach ($namespaces[0] as $namespace)
+        foreach ($namespaces[0] as $namespace) {
             $fileContents .= $namespace;
+        }
 
         $fileContents .= 'class '.$className.$parentClass.PHP_EOL;
         $fileContents .= '{'.PHP_EOL;
@@ -115,15 +117,18 @@ class CodeParser
         $this->validate($fileContents);
 
         $dir = dirname($path);
-        if (!File::isDirectory($dir) && !@File::makeDirectory($dir, 0777, true))
+        if (!File::isDirectory($dir) && !@File::makeDirectory($dir, 0777, true)) {
             throw new SystemException(Lang::get('system::lang.directory.create_fail', ['name'=>$dir]));
+        }
 
-        if (!@File::put($path, $fileContents))
+        if (!@File::put($path, $fileContents)) {
             throw new SystemException(Lang::get('system::lang.file.create_fail', ['name'=>$dir]));
+        }
 
         $cached = $this->getCachedInfo();
-        if (!$cached)
+        if (!$cached) {
             $cached = [];
+        }
 
         $result['className'] = $className;
         $result['source'] = 'parser';
@@ -148,8 +153,9 @@ class CodeParser
     {
         $data = $this->parse();
 
-        if (!class_exists($data['className']))
+        if (!class_exists($data['className'])) {
             require_once $data['filePath'];
+        }
         
         $className = $data['className'];
         return new $className($page, $layout, $controller);
@@ -186,8 +192,9 @@ class CodeParser
     protected function getCachedInfo()
     {
         $cached = Cache::get($this->dataCacheKey, false);
-        if ($cached !== false && ($cached = @unserialize($cached)) !== false)
+        if ($cached !== false && ($cached = @unserialize($cached)) !== false) {
             return $cached;
+        }
 
         return null;
     }
@@ -200,8 +207,9 @@ class CodeParser
     {
         $cached = $this->getCachedInfo();
         if ($cached !== null) {
-            if (array_key_exists($this->filePath, $cached))
+            if (array_key_exists($this->filePath, $cached)) {
                 return $cached[$this->filePath];
+            }
         }
 
         return null;

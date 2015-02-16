@@ -15,29 +15,59 @@ class SettingsManager
     use \October\Rain\Support\Traits\Singleton;
 
     /**
+     * Allocated category types
+     */
+    const CATEGORY_CMS = 'system::lang.system.categories.cms';
+    const CATEGORY_MISC = 'system::lang.system.categories.misc';
+    const CATEGORY_MAIL = 'system::lang.system.categories.mail';
+    const CATEGORY_LOGS = 'system::lang.system.categories.logs';
+    const CATEGORY_SHOP = 'system::lang.system.categories.shop';
+    const CATEGORY_TEAM = 'system::lang.system.categories.team';
+    const CATEGORY_USERS = 'system::lang.system.categories.users';
+    const CATEGORY_SOCIAL = 'system::lang.system.categories.social';
+    const CATEGORY_SYSTEM = 'system::lang.system.categories.system';
+    const CATEGORY_EVENTS = 'system::lang.system.categories.events';
+    const CATEGORY_CUSTOMERS = 'system::lang.system.categories.customers';
+    const CATEGORY_MYSETTINGS = 'system::lang.system.categories.my_settings';
+
+    /**
      * @var array Cache of registration callbacks.
      */
-    private $callbacks = [];
+    protected $callbacks = [];
 
     /**
      * @var array List of registered items.
      */
-    private $items;
+    protected $items;
     
     /**
      * @var array Flat collection of all items.
      */
-    private $allItems;
+    protected $allItems;
 
-    static $itemDefaults = [
+    /**
+     * @var string Active plugin or module owner.
+     */
+    protected $contextOwner;
+
+    /**
+     * @var string Active item code.
+     */
+    protected $contextItemCode;
+
+    /**
+     * @var array Settings item defaults.
+     */
+    protected static $itemDefaults = [
         'code'        => null,
         'label'       => null,
         'category'    => null,
         'icon'        => null,
         'url'         => null,
         'permissions' => [],
-        'order'       => 100,
+        'order'       => 500,
         'context'     => 'system',
+        'keywords'    => null
     ];
 
     /**
@@ -69,8 +99,9 @@ class SettingsManager
 
         foreach ($plugins as $id => $plugin) {
             $items = $plugin->registerSettings();
-            if (!is_array($items))
+            if (!is_array($items)) {
                 continue;
+            }
 
             $this->registerSettingItems($id, $items);
         }
@@ -78,7 +109,7 @@ class SettingsManager
         /*
          * Sort settings items
          */
-        usort($this->items, function($a, $b) {
+        usort($this->items, function ($a, $b) {
             return $a->order - $b->order;
         });
 
@@ -92,11 +123,11 @@ class SettingsManager
          * Process each item in to a category array
          */
         $catItems = [];
-        foreach ($this->items as $item)
-        {
+        foreach ($this->items as $item) {
             $category = $item->category ?: 'Misc';
-            if (!isset($catItems[$category]))
+            if (!isset($catItems[$category])) {
                 $catItems[$category] = [];
+            }
 
             $catItems[$category][] = $item;
         }
@@ -110,11 +141,13 @@ class SettingsManager
      */
     public function listItems($context = null)
     {
-        if ($this->items === null)
+        if ($this->items === null) {
             $this->loadItems();
+        }
 
-        if ($context !== null)
+        if ($context !== null) {
             return $this->filterByContext($this->items, $context);
+        }
 
         return $this->items;
     }
@@ -133,12 +166,14 @@ class SettingsManager
             $filteredCategory = [];
             foreach ($category as $item) {
                 $itemContext = is_array($item->context) ? $item->context : [$item->context];
-                if (in_array($context, $itemContext))
+                if (in_array($context, $itemContext)) {
                     $filteredCategory[] = $item;
+                }
             }
 
-            if (count($filteredCategory))
+            if (count($filteredCategory)) {
                 $filteredItems[$categoryName] = $filteredCategory;
+            }
         }
 
         return $filteredItems;
@@ -179,8 +214,9 @@ class SettingsManager
      */
     public function registerSettingItems($owner, array $definitions)
     {
-        if (!$this->items)
+        if (!$this->items) {
             $this->items = [];
+        }
 
         foreach ($definitions as $code => $definition) {
             $item = array_merge(self::$itemDefaults, array_merge($definition, [
@@ -199,8 +235,9 @@ class SettingsManager
                     $uri[] = strtolower($author);
                     $uri[] = strtolower($plugin);
                 }
-                else
+                else {
                     $uri[] = strtolower($owner);
+                }
 
                 $uri[] = strtolower($code);
                 $uri =  implode('/', $uri);
@@ -212,6 +249,33 @@ class SettingsManager
     }
 
     /**
+     * Sets the navigation context.
+     * @param string $owner Specifies the setting items owner plugin or module in the format Vendor/Module.
+     * @param string $code Specifies the settings item code.
+     */
+    public static function setContext($owner, $code)
+    {
+        $instance = self::instance();
+
+        $instance->contextOwner = strtolower($owner);
+        $instance->contextItemCode = strtolower($code);
+    }
+
+    /**
+     * Returns information about the current settings context.
+     * @return mixed Returns an object with the following fields:
+     * - itemCode
+     * - owner
+     */
+    public function getContext()
+    {
+        return (object)[
+            'itemCode' => $this->contextItemCode,
+            'owner' => $this->contextOwner
+        ];
+    }
+
+    /**
      * Locates a setting item object by it's owner and code
      * @param string $owner
      * @param string $code
@@ -219,15 +283,17 @@ class SettingsManager
      */
     public function findSettingItem($owner, $code)
     {
-        if ($this->allItems === null)
+        if ($this->allItems === null) {
             $this->loadItems();
+        }
 
         $owner = strtolower($owner);
         $code = strtolower($code);
 
         foreach ($this->allItems as $item) {
-            if (strtolower($item->owner) == $owner && strtolower($item->code) == $code)
+            if (strtolower($item->owner) == $owner && strtolower($item->code) == $code) {
                 return $item;
+            }
         }
 
         return false;
@@ -239,11 +305,12 @@ class SettingsManager
      * @param array $items A collection of setting items
      * @return array The filtered settings items
      */
-    private function filterItemPermissions($user, array $items)
+    protected function filterItemPermissions($user, array $items)
     {
-        array_filter($items, function($item) use ($user) {
-            if (!$item->permissions || !count($item->permissions))
+        $items = array_filter($items, function ($item) use ($user) {
+            if (!$item->permissions || !count($item->permissions)) {
                 return true;
+            }
 
             return $user->hasAnyAccess($item->permissions);
         });

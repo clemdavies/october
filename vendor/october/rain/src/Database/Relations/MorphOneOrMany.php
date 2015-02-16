@@ -17,9 +17,7 @@ trait MorphOneOrMany
         }
         else {
             $this->add($model, $sessionKey);
-
-            // Save the related model and any deferred bindings it might have
-            return $model->save(null, $sessionKey) ? $model : false;
+            return $model->save() ? $model : false;
         }
     }
 
@@ -66,19 +64,6 @@ trait MorphOneOrMany
         else {
             $this->parent->unbindDeferred($this->relationName, $model, $sessionKey);
         }
-    }
-
-    /**
-     * Joins the relationship tables to a query as a LEFT JOIN.
-     */
-    public function joinWithQuery($query)
-    {
-        $query = $query ?: $this->query;
-
-        // @todo Join everything that has my foreign key in the other table
-        // with constraints
-
-        return $this;
     }
 
 }

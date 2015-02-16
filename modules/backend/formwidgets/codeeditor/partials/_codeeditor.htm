@@ -16,19 +16,19 @@
         data-show-gutter="<?= $showGutter ? 'true' : 'false' ?>"
         data-language="<?= $language ?>"
         data-margin="<?= $margin ?>"
-        data-vendor-path="<?= URL::asset('/modules/backend/formwidgets/codeeditor/assets/vendor/ace') ?>/">
+        data-vendor-path="<?= URL::asset('/modules/backend/formwidgets/codeeditor/assets/vendor/ace') ?>">
         <div class="editor-toolbar">
             <ul>
                 <li class="fullscreen-enable">
                     <a href="javascript:;">
                         <i class="icon-desktop"></i>
-                        <abbr title="ctrl+alt+f">Enter fullscreen mode</abbr>
+                        <abbr title="ctrl+alt+f"><?= e(trans('cms::lang.editor.enter_fullscreen')) ?></abbr>
                     </a>
                 </li>
                 <li class="fullscreen-disable">
                     <a href="javascript:;">
                         <i class="icon-desktop"></i>
-                        <abbr title="ctrl+alt+f or esc">Exit fullscreen mode</abbr>
+                        <abbr title="ctrl+alt+f or esc"><?= e(trans('cms::lang.editor.exit_fullscreen')) ?></abbr>
                     </a>
                 </li>
             </ul>

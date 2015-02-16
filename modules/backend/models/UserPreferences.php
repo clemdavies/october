@@ -6,6 +6,12 @@ use October\Rain\Database\Model;
 use System\Classes\SystemException;
 use October\Rain\Auth\Models\Preferences as PreferencesBase;
 
+/**
+ * All preferences for the backend user
+ *
+ * @package october\backend
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class UserPreferences extends PreferencesBase
 {
     /**
@@ -25,8 +31,9 @@ class UserPreferences extends PreferencesBase
     public function resolveUser($user)
     {
         $user = BackendAuth::getUser();
-        if (!$user)
+        if (!$user) {
             throw new SystemException(trans('backend::lang.user.preferences.not_authenticated'));
+        }
 
         return $user;
     }

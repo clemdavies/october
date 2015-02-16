@@ -3,6 +3,7 @@
 use DB;
 use Str;
 use Closure;
+use DbDongle;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -49,7 +50,7 @@ class DataFeed
     /**
      * @var Builder Cache containing the generic collection union query.
      */
-    private $queryCache;
+    protected $queryCache;
 
     /**
      * @var bool
@@ -165,7 +166,7 @@ class DataFeed
     /**
      * Creates a generic union query of each added collection
      */
-    private function processCollection()
+    protected function processCollection()
     {
         if ($this->queryCache !== null)
             return $this->queryCache;
@@ -176,7 +177,13 @@ class DataFeed
             extract($data);
             $cleanQuery = clone $this->getQuery($item);
             $model = $this->getModel($item);
-            $class = str_replace('\\', '\\\\', get_class($model));
+
+            if (DbDongle::getDriver() == 'sqlite') {
+                $class = get_class($model);
+            }
+            else {
+                $class = str_replace('\\', '\\\\', get_class($model));
+            }
 
             $sorting = $model->getTable() . '.';
             $sorting .= $orderBy ?: $this->sortField;
@@ -208,7 +215,7 @@ class DataFeed
     /**
      * Get the model from a builder object
      */
-    private function getModel($item)
+    protected function getModel($item)
     {
         return $item->getModel();
     }
@@ -216,7 +223,7 @@ class DataFeed
     /**
      * Get the query from a builder object
      */
-    private function getQuery($item)
+    protected function getQuery($item)
     {
         return $item->getQuery();
     }

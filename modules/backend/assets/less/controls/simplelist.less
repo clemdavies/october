@@ -11,7 +11,7 @@
 // With icons:
 //   <div class="control-simplelist with-icons">
 //       <ul>
-//           <li class="oc-icon-ok">Hello friend</li>
+//           <li class="oc-icon-check">Hello friend</li>
 //       </ul>
 //   </div>
 //
@@ -32,6 +32,14 @@
     font-size: 13px;
 
     ul { padding-left: 15px; }
+
+    &.form-control {
+        ul { margin-bottom: 0; }
+        li {
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+    }
 
     &.with-icons, &.with-checkboxes, &.is-selectable {
         ul {

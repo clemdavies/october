@@ -3,13 +3,30 @@
 return [
     'app' => [
         'name' => 'October CMS',
-        'motto' => 'Zurück zum Wesentlichen',
+        'tagline' => 'Zurück zum Wesentlichen',
+    ],
+    'locale' => [
+        'en' => 'English',
+        'nl' => 'Dutch',
+        'ja' => 'Japanese',
+        'se' => 'Swedish',
+        'tr' => 'Turkish',
+        'de' => 'German',
+        'ru' => 'Russian',
+        'fr' => 'French',
+        'it' => 'Italian',
+        'ro' => 'Romana',
+        'pt-br' => 'Brazilian Portuguese',
+        'fa' => 'Persian',
     ],
     'directory' => [
         'create_fail' => "Konnte Verzeichnis: :name nicht erstellen",
     ],
     'file' => [
         'create_fail' => "Konnte Datei :name nicht erstellen",
+    ],
+    'combiner' => [
+        'not_found' => "Die combiner Datei ':name' wurde nicht gefunden.",
     ],
     'system' => [
         'name' => 'System',

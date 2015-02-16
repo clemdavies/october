@@ -3,12 +3,31 @@ div.control-popover {
     background-clip: content-box;
     left: 0;
     top: 0;
-    z-index: 161;
+    z-index: 570;
+    visibility: hidden;
+
+    &.in, &.fade {
+        visibility: visible;
+    }
+
+    &.fade {
+        & > div {
+            .opacity(0);
+            .transition(~'all 0.3s, width 0s');
+            .transform(~'scale(0.7)');
+        }
+    }
+
+    &.fade.in {
+        & > div {
+            .opacity(1);
+            .transform( ~'scale(1)');
+        }
+    }
 
     & > div {
         position: relative;
         background: @color-popover-bg;
-        border: 1px solid @color-popover-border;
         .box-shadow(2px 2px 2px rgba(0,0,0,0.05));
         .border-top-radius(5px);
         .border-bottom-radius(2px);
@@ -17,8 +36,8 @@ div.control-popover {
             position: absolute;
         }
 
-        &:after {z-index: 201;}
-        &:before {z-index: 200;}
+        &:after { z-index: 601; }
+        &:before { z-index: 600; }
     }
 
     &.placement-bottom > div {
@@ -79,6 +98,14 @@ div.control-popover {
 
     div.popover-body {
         padding: 15px;
+
+        &.form-container {
+            padding-bottom: 0;
+        }
+    }
+
+    div.popover-footer {
+        padding: 0 20px 20px 20px;
     }
 
     .popover-head {
@@ -89,7 +116,7 @@ div.control-popover {
         .border-top-radius(2px);
 
         &:before {
-            z-index: 202;
+            z-index: 602;
             position: absolute;
         }
 
@@ -97,19 +124,22 @@ div.control-popover {
             font-size: 14px;
             font-weight: 600;
             margin-top: 0;
+            margin-bottom: 0;
+            padding-right: 15px;
+            line-height: 130%;
         }
 
         p {
             font-size: 13px;
             font-weight: 100;
-            margin: 0;
+            margin: 10px 0 0 0;
         }
 
         .close {
             float: none;
             position: absolute;
-            right: 7px;
-            top: 4px;
+            right: 11px;
+            top: 12px;
             color: @color-popover-head-text;
             outline: none;
 
@@ -140,9 +170,9 @@ div.control-popover {
 
 .popover-highlight {
     position: relative;
-    z-index: 162!important;
+    z-index: 562 !important;
     &:hover, &:active, &:focus {
-        z-index: 162!important;
+        z-index: 562 !important;
     }
 }
 
@@ -153,7 +183,7 @@ div.popover-overlay {
     right: 0;
     bottom: 0;
     background: rgba(0,0,0,0.3);
-    z-index: 160;
+    z-index: 560;
 }
 
 @media (max-width: @screen-xs) {
@@ -167,12 +197,12 @@ div.popover-overlay {
             position: fixed;
             margin: 0;
             padding: 10px;
-            width: 100%!important;
-            z-index: 209;
-            top: 0!important;
-            right: 0!important;
-            bottom: 0!important;
-            left: 0!important;
+            width: 100% !important;
+            z-index: 609;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
 
             > div {
                 padding: 0;

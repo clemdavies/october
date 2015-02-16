@@ -3,13 +3,30 @@
 return [
     'app' => [
         'name' => 'October CMS',
-        'motto' => 'Getting back to basics',
+        'tagline' => 'Getting back to basics',
+    ],
+    'locale' => [
+        'en' => 'English',
+        'nl' => 'Dutch',
+        'ja' => 'Japanese',
+        'se' => 'Swedish',
+        'tr' => 'Turkish',
+        'de' => 'German',
+        'ru' => 'Russian',
+        'fr' => 'French',
+        'it' => 'Italian',
+        'ro' => 'Romana',
+        'pt-br' => 'Brazilian Portuguese',
+        'fa' => 'Persian',
     ],
     'directory' => [
         'create_fail' => "Kunde inte skapa mapp: :name",
     ],
     'file' => [
         'create_fail' => "Kunde inte skapa fil: :name",
+    ],
+    'combiner' => [
+        'not_found' => "Kombinationsfilen ':name' kunde ej hittas",
     ],
     'system' => [
         'name' => 'System',

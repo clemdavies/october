@@ -1,11 +1,11 @@
 <?php namespace Backend\Classes;
 
 use App;
-use Str;
 use Log;
 use Lang;
 use View;
 use Flash;
+use Event;
 use Request;
 use Backend;
 use Session;
@@ -33,8 +33,9 @@ class Controller extends Extendable
 {
     use \System\Traits\AssetMaker;
     use \System\Traits\ConfigMaker;
-    use \Backend\Traits\ViewMaker;
+    use \System\Traits\ViewMaker;
     use \Backend\Traits\WidgetMaker;
+    use \October\Rain\Support\Traits\Emitter;
 
     /**
      * @var string Object used for storing a fatal error.
@@ -94,7 +95,15 @@ class Controller extends Extendable
     /**
      * @var array Default methods which cannot be called as actions.
      */
-    public $hiddenActions = ['run', 'actionExists', 'pageAction', 'getId', 'setStatusCode', 'handleError', 'makeHintPartial'];
+    public $hiddenActions = [
+        'run',
+        'actionExists',
+        'pageAction',
+        'getId',
+        'setStatusCode',
+        'handleError',
+        'makeHintPartial'
+    ];
 
     /**
      * @var array Controller specified methods which cannot be called as actions.
@@ -126,7 +135,7 @@ class Controller extends Extendable
          * Define layout and view paths
          */
         $this->layout = 'default';
-        $this->layoutPath = ['modules/backend/layouts'];
+        $this->layoutPath = Skin::getActive()->getLayoutPaths();
 
         // Option A: (@todo Determine which is faster by benchmark)
         // $relativePath = strtolower(str_replace('\\', '/', get_called_class()));
@@ -150,6 +159,16 @@ class Controller extends Extendable
         $this->params = $params;
 
         /*
+         * Extensibility
+         */
+        if (
+            ($event = $this->fireEvent('page.beforeDisplay', [$action, $params], true)) ||
+            ($event = Event::fire('backend.page.beforeDisplay', [$this, $action, $params], true))
+        ) {
+            return $event;
+        }
+
+        /*
          * Determine if this request is a public action.
          */
         $isPublicAction = in_array($action, $this->publicActions);
@@ -162,16 +181,21 @@ class Controller extends Extendable
          */
         if (!$isPublicAction) {
 
-            // Not logged in, redirect to login screen or show ajax error
+            /*
+             * Not logged in, redirect to login screen or show ajax error.
+             */
             if (!BackendAuth::check()) {
                 return Request::ajax()
                     ? Response::make(Lang::get('backend::lang.page.access_denied.label'), 403)
                     : Redirect::guest(Backend::url('backend/auth'));
             }
 
-            // Check his access groups against the page definition
-            if ($this->requiredPermissions && !$this->user->hasAnyAccess($this->requiredPermissions))
+            /*
+             * Check access groups against the page definition
+             */
+            if ($this->requiredPermissions && !$this->user->hasAnyAccess($this->requiredPermissions)) {
                 return Response::make(View::make('backend::access_denied'), 403);
+            }
         }
 
         /*
@@ -180,7 +204,7 @@ class Controller extends Extendable
         if (Session::has('locale')) {
             App::setLocale(Session::get('locale'));
         }
-        elseif ($this->user && $locale = BackendPreferences::get('locale')) {
+        elseif ($this->user && ($locale = BackendPreferences::get('locale'))) {
             Session::put('locale', $locale);
             App::setLocale($locale);
         }
@@ -188,22 +212,29 @@ class Controller extends Extendable
         /*
          * Execute AJAX event
          */
-        if ($ajaxResponse = $this->execAjaxHandlers())
+        if ($ajaxResponse = $this->execAjaxHandlers()) {
             return $ajaxResponse;
+        }
 
         /*
          * Execute postback handler
          */
-        if (($handler = post('_handler')) && ($handlerResponse = $this->runAjaxHandler($handler)) && $handlerResponse !== true)
+        if (
+            ($handler = post('_handler')) &&
+            ($handlerResponse = $this->runAjaxHandler($handler)) &&
+            $handlerResponse !== true
+        ) {
             return $handlerResponse;
+        }
 
         /*
          * Execute page action
          */
         $result = $this->execPageAction($action, $params);
 
-        if (!is_string($result))
+        if (!is_string($result)) {
             return $result;
+        }
 
         return Response::make($result, $this->statusCode);
     }
@@ -218,12 +249,14 @@ class Controller extends Extendable
      */
     public function actionExists($name, $internal = false)
     {
-        if (!strlen($name) || substr($name, 0, 1) == '_' || !$this->methodExists($name))
+        if (!strlen($name) || substr($name, 0, 1) == '_' || !$this->methodExists($name)) {
             return false;
+        }
 
         foreach ($this->hiddenActions as $method) {
-            if (strtolower($name) == strtolower($method))
+            if (strtolower($name) == strtolower($method)) {
                 return false;
+            }
         }
 
         $ownMethod = method_exists($this, $name);
@@ -231,27 +264,31 @@ class Controller extends Extendable
         if ($ownMethod) {
             $methodInfo = new \ReflectionMethod($this, $name);
             $public = $methodInfo->isPublic();
-            if ($public)
+            if ($public) {
                 return true;
+            }
         }
 
-        if ($internal && (($ownMethod && $methodInfo->isProtected()) || !$ownMethod))
+        if ($internal && (($ownMethod && $methodInfo->isProtected()) || !$ownMethod)) {
             return true;
+        }
 
-        if (!$ownMethod)
+        if (!$ownMethod) {
             return true;
+        }
 
         return false;
     }
 
     /**
      * Invokes the current controller action without rendering a view,
-     * used by AJAX handler who may rely on the logic inside the action.
+     * used by AJAX handler that may rely on the logic inside the action.
      */
     public function pageAction()
     {
-        if (!$this->action)
+        if (!$this->action) {
             return;
+        }
 
         $this->suppressView = true;
         $this->execPageAction($this->action, $this->params);
@@ -267,23 +304,30 @@ class Controller extends Extendable
     {
         $result = null;
 
-        if (!$this->actionExists($actionName))
-            throw new SystemException(sprintf("Action %s is not found in the controller %s", $actionName, get_class($this)));
+        if (!$this->actionExists($actionName)) {
+            throw new SystemException(sprintf(
+                "Action %s is not found in the controller %s",
+                $actionName,
+                get_class($this)
+            ));
+        }
 
         // Execute the action
         $result = call_user_func_array([$this, $actionName], $parameters);
 
-        if ($result instanceof RedirectResponse)
+        if ($result instanceof RedirectResponse) {
             return $result;
+        }
 
-        // Translate the page title
-        $this->pageTitle = $this->pageTitle
-            ? Lang::get($this->pageTitle)
-            : Lang::get('backend::lang.page.untitled');
+        // No page title
+        if (!$this->pageTitle) {
+            $this->pageTitle = 'backend::lang.page.untitled';
+        }
 
         // Load the view
-        if (!$this->suppressView && is_null($result))
+        if (!$this->suppressView && is_null($result)) {
             return $this->makeView($actionName);
+        }
 
         return $this->makeViewContent($result);
     }
@@ -299,8 +343,9 @@ class Controller extends Extendable
                 /*
                  * Validate the handler name
                  */
-                if (!preg_match('/^(?:\w+\:{2})?on[A-Z]{1}[\w+]*$/', $handler))
+                if (!preg_match('/^(?:\w+\:{2})?on[A-Z]{1}[\w+]*$/', $handler)) {
                     throw new SystemException(Lang::get('cms::lang.ajax_handler.invalid_name', ['name'=>$handler]));
+                }
 
                 /*
                  * Validate the handler partial list
@@ -310,8 +355,12 @@ class Controller extends Extendable
 
                     // @todo Do we need to validate backend partials?
                     // foreach ($partialList as $partial) {
-                    //     if (!preg_match('/^(?:\w+\:{2}|@)?[a-z0-9\_\-\.\/]+$/i', $partial))
-                    //         throw new SystemException(Lang::get('cms::lang.partial.invalid_name', ['name'=>$partial]));
+                    //     if (!preg_match('/^(?:\w+\:{2}|@)?[a-z0-9\_\-\.\/]+$/i', $partial)) {
+                    //         throw new SystemException(Lang::get(
+                    //             'cms::lang.partial.invalid_name',
+                    //             ['name' => $partial]
+                    //         ));
+                    //     }
                     // }
                 }
                 else {
@@ -323,23 +372,27 @@ class Controller extends Extendable
                 /*
                  * Execute the handler
                  */
-                if (!$result = $this->runAjaxHandler($handler))
-                    throw new SystemException(Lang::get('cms::lang.ajax_handler.not_found', ['name'=>$handler]));
+                if (!$result = $this->runAjaxHandler($handler)) {
+                    throw new ApplicationException(Lang::get('cms::lang.ajax_handler.not_found', ['name'=>$handler]));
+                }
 
                 /*
                  * If the handler returned an array, we should add it to output for rendering.
                  * If it is a string, add it to the array with the key "result".
                  */
-                if (is_array($result))
+                if (is_array($result)) {
                     $responseContents = array_merge($responseContents, $result);
-                elseif (is_string($result))
+                }
+                elseif (is_string($result)) {
                     $responseContents['result'] = $result;
+                }
 
                 /*
                  * Render partials and return the response as array that will be converted to JSON automatically.
                  */
-                foreach ($partialList as $partial)
+                foreach ($partialList as $partial) {
                     $responseContents[$partial] = $this->makePartial($partial);
+                }
 
                 /*
                  * If the handler returned a redirect, process it so framework.js knows to redirect
@@ -347,11 +400,11 @@ class Controller extends Extendable
                  */
                 if ($result instanceof RedirectResponse) {
                     $responseContents['X_OCTOBER_REDIRECT'] = $result->getTargetUrl();
-                }
                 /*
                  * No redirect is used, look for any flash messages
                  */
-                else if (Flash::check()) {
+                }
+                elseif (Flash::check()) {
                     $responseContents['#layout-flash-messages'] = $this->makeLayoutPartial('flash_messages');
                 }
 
@@ -375,10 +428,13 @@ class Controller extends Extendable
                 return Response::make($responseContents, 406);
             }
             catch (MassAssignmentException $ex) {
-                return Response::make(Lang::get('backend::lang.model.mass_assignment_failed', ['attribute' => $ex->getMessage()]), 500);
+                return Response::make(
+                    Lang::get('backend::lang.model.mass_assignment_failed', ['attribute' => $ex->getMessage()]),
+                    500
+                );
             }
             catch (Exception $ex) {
-                return Response::make($ex->getMessage(), 500);
+                return Response::make(ApplicationException::getDetailedMessage($ex), 500);
             }
         }
 
@@ -403,11 +459,13 @@ class Controller extends Extendable
              */
             $this->pageAction();
 
-            if ($this->fatalError)
+            if ($this->fatalError) {
                 throw new SystemException($this->fatalError);
+            }
 
-            if (!isset($this->widget->{$widgetName}))
+            if (!isset($this->widget->{$widgetName})) {
                 throw new SystemException(Lang::get('backend::lang.widget.not_bound', ['name'=>$widgetName]));
+            }
 
             if (($widget = $this->widget->{$widgetName}) && method_exists($widget, $handlerName)) {
                 $result = call_user_func_array([$widget, $handlerName], $this->params);
@@ -455,9 +513,10 @@ class Controller extends Extendable
      */
     public function getId($suffix = null)
     {
-        $id = Str::getRealClass(get_called_class()) . '-' . $this->action;
-        if ($suffix !== null)
+        $id = class_basename(get_called_class()) . '-' . $this->action;
+        if ($suffix !== null) {
             $id .= '-' . $suffix;
+        }
 
         return $id;
     }
@@ -477,8 +536,9 @@ class Controller extends Extendable
      */
     public function handleError($exception)
     {
-        $this->fatalError = $exception->getMessage();
-        $this->vars['fatalError'] = $exception->getMessage();
+        $errorMessage = ApplicationException::getDetailedMessage($exception);
+        $this->fatalError = $errorMessage;
+        $this->vars['fatalError'] = $errorMessage;
     }
 
     //
@@ -493,8 +553,12 @@ class Controller extends Extendable
      * @param  array  $params  Extra parameters
      * @return string
      */
-    public function makeHintPartial($name, $partial, array $params = [])
+    public function makeHintPartial($name, $partial = null, array $params = [])
     {
+        if (!$partial) {
+            $partial = $name;
+        }
+
         return $this->makeLayoutPartial('hint', [
             'hintName'    => $name,
             'hintPartial' => $partial,
@@ -509,8 +573,9 @@ class Controller extends Extendable
      */
     public function onHideBackendHint()
     {
-        if (!$name = post('name'))
+        if (!$name = post('name')) {
             throw new ApplicationException('Missing a hint name.');
+        }
 
         $preferences = UserPreferences::forUser();
         $hiddenHints = $preferences->get('backend::hints.hidden', []);
@@ -529,5 +594,4 @@ class Controller extends Extendable
         $hiddenHints = UserPreferences::forUser()->get('backend::hints.hidden', []);
         return array_key_exists($name, $hiddenHints);
     }
-
 }

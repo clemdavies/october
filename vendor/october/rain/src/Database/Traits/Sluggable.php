@@ -5,9 +5,10 @@ use Exception;
 
 trait Sluggable
 {
+
     /**
      * @var array List of attributes to automatically generate unique URL names (slugs) for.
-     * 
+     *
      * protected $slugs = [];
      */
 
@@ -39,8 +40,9 @@ trait Sluggable
      */
     public function slugAttributes()
     {
-        foreach ($this->slugs as $slugAttribute => $sourceAttributes)
+        foreach ($this->slugs as $slugAttribute => $sourceAttributes) {
             $this->setSluggedValue($slugAttribute, $sourceAttributes);
+        }
     }
 
     /**
@@ -59,18 +61,18 @@ trait Sluggable
 
             $slugArr = [];
             foreach ($sourceAttributes as $attribute) {
-                $slugArr[] = $this->getAttribute($attribute);
+                $slugArr[] = $this->getSluggableSourceAttributeValue($attribute);
             }
 
             $slug = implode(' ', $slugArr);
             $slug = substr($slug, 0, $maxLength);
-            $slug = Str::slug($slug);
+            $slug = Str::slug($slug, $this->getSluggableSeparator());
         }
         else {
             $slug = $this->{$slugAttribute};
         }
 
-        return $this->{$slugAttribute} = $this->getUniqueAttributeValue($slugAttribute, $slug);
+        return $this->{$slugAttribute} = $this->getSluggableUniqueAttributeValue($slugAttribute, $slug);
     }
 
     /**
@@ -79,10 +81,10 @@ trait Sluggable
      * @param value $value The desired column value.
      * @return string A safe value that is unique.
      */
-    public function getUniqueAttributeValue($name, $value)
+    protected function getSluggableUniqueAttributeValue($name, $value)
     {
         $counter = 1;
-        $separator = '-';
+        $separator = $this->getSluggableSeparator();
 
         // Remove any existing suffixes
         $_value = preg_replace('/'.preg_quote($separator).'[0-9]+$/', '', trim($value));
@@ -93,6 +95,37 @@ trait Sluggable
         }
 
         return $_value;
+    }
+
+    /**
+     * Get an attribute relation value using dotted notation.
+     * Eg: author.name
+     * @return mixed
+     */
+    protected function getSluggableSourceAttributeValue($key)
+    {
+        if (strpos($key, '.') === false)
+            return $this->getAttribute($key);
+
+        $keyParts = explode('.', $key);
+        $value = $this;
+        foreach ($keyParts as $part) {
+            if (!isset($value[$part]))
+                return null;
+
+            $value = $value[$part];
+        }
+
+        return $value;
+    }
+
+    /**
+     * Override the default slug separator.
+     * @return string
+     */
+    public function getSluggableSeparator()
+    {
+        return defined('static::SLUG_SEPARATOR') ? static::SLUG_SEPARATOR : '-';
     }
 
 }

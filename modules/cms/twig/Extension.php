@@ -3,6 +3,7 @@
 use URL;
 use Flash;
 use Block;
+use Event;
 use Twig_Extension;
 use Twig_TokenParser;
 use Twig_SimpleFilter;
@@ -22,13 +23,13 @@ class Extension extends Twig_Extension
     /**
      * @var \Cms\Classes\Controller A reference to the CMS controller.
      */
-    private $controller;
+    protected $controller;
 
     /**
      * Creates the extension instance.
      * @param \Cms\Classes\Controller $controller The CMS controller object.
      */
-    public function __construct(Controller $controller)
+    public function __construct(Controller $controller = null)
     {
         $this->controller = $controller;
     }
@@ -151,8 +152,9 @@ class Extension extends Twig_Extension
      */
     public function placeholderFunction($name, $default = null)
     {
-        if (($result = Block::get($name)) === null)
+        if (($result = Block::get($name)) === null) {
             return null;
+        }
 
         $result = str_replace('<!-- X_OCTOBER_DEFAULT_BLOCK_CONTENT -->', trim($default), $result);
         return $result;
@@ -199,8 +201,12 @@ class Extension extends Twig_Extension
      */
     public function displayBlock($name, $default = null)
     {
-        if (($result = Block::placeholder($name)) === null)
-            return null;
+        if (($result = Block::placeholder($name)) === null) {
+            return $default;
+        }
+
+        if ($event = Event::fire('cms.block.render', [$name, $result], true))
+            $result = $event;
 
         $result = str_replace('<!-- X_OCTOBER_DEFAULT_BLOCK_CONTENT -->', trim($default), $result);
         return $result;
@@ -209,8 +215,8 @@ class Extension extends Twig_Extension
     /**
      * Closes a layout block.
      */
-    public function endBlock()
+    public function endBlock($append = true)
     {
-        Block::endBlock();
+        Block::endBlock($append);
     }
 }

@@ -4,6 +4,12 @@ use App;
 use Model;
 use DirectoryIterator;
 
+/**
+ * Code editor preferences for the backend user\
+ *
+ * @package october\backend
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class EditorPreferences extends Model
 {
     public $implement = ['Backend.Behaviors.UserPreferencesModel'];
@@ -65,6 +71,6 @@ class EditorPreferences extends Model
 
         // Sort the theme alphabetically, and push the default theme
         asort($themes);
-        return [static::DEFAULT_THEME => 'Twilight'] + $themes;
+        return [static::DEFAULT_THEME => ucwords(static::DEFAULT_THEME)] + $themes;
     }
 }

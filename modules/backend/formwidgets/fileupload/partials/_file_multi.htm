@@ -2,7 +2,6 @@
     id="<?= $this->getId() ?>"
     class="field-fileupload is-multi <?= count($fileList) ? 'has-attachments' : '' ?> is-sortable"
     data-control="fileupload"
-    data-upload-input="#<?= $this->getId('uploadInput') ?>"
     data-unique-id="<?= $this->getId() ?>"
     data-sort-handler="<?= $this->getEventHandler('onSortAttachments') ?>"
     data-item-template="<?= $this->getId('template') ?>">
@@ -24,14 +23,6 @@
         </ul>
 
     </div>
-
-    <!-- Upload form -->
-    <input
-        id="<?= $this->getId('uploadInput') ?>"
-        type="file"
-        multiple="true"
-        name="file_data"
-        class="attachment-input" />
 
     <!-- Populated File -->
     <script type="text/template" id="<?= $this->getId('template') ?>">
@@ -55,21 +46,29 @@
                     {{#description}}
                         <p><abbr title="{{description}}">{{description}}</abbr></p>
                     {{/description}}
-                    <a
-                        href="javascript:;" 
-                        class="uploader-remove oc-icon-times"
-                        data-request="<?= $this->getEventHandler('onRemoveAttachment') ?>"
-                        data-request-data="file_id: {{id}}"></a>
-                    <a
-                        href="javascript:;" 
-                        class="uploader-config oc-icon-cog"
-                        data-control="popup"
-                        data-handler="<?= $this->getEventHandler('onLoadAttachmentConfig') ?>"
-                        data-request-data="file_id: {{id}}"></a>
-                    <a
-                        href="{{path}}"
-                        class="uploader-file-link oc-icon-paper-clip"
-                        target="_blank"></a>
+
+                    <?php if (!$this->previewMode): ?>
+                        <a
+                            href="javascript:;"
+                            class="uploader-remove oc-icon-times"
+                            data-request="<?= $this->getEventHandler('onRemoveAttachment') ?>"
+                            data-request-data="file_id: {{id}}"></a>
+                    <?php endif ?>
+
+                    <div class="controls">
+                        <?php if (!$this->previewMode): ?>
+                            <a
+                                href="javascript:;"
+                                class="uploader-config oc-icon-cog"
+                                data-control="popup"
+                                data-handler="<?= $this->getEventHandler('onLoadAttachmentConfig') ?>"
+                                data-request-data="file_id: {{id}}"></a>
+                        <?php endif ?>
+                        <a
+                            href="{{path}}"
+                            class="uploader-file-link oc-icon-paperclip"
+                            target="_blank"></a>
+                    </div>
                 </div>
                 <div class="uploader-loading"></div>
             </div>

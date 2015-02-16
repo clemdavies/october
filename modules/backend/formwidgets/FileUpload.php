@@ -1,11 +1,14 @@
 <?php namespace Backend\FormWidgets;
 
+use Str;
 use Input;
 use Validator;
 use System\Models\File;
 use System\Classes\SystemException;
+use Backend\Classes\FormField;
 use Backend\Classes\FormWidgetBase;
 use October\Rain\Support\ValidationException;
+use Exception;
 
 /**
  * File upload field
@@ -37,7 +40,11 @@ class FileUpload extends FormWidgetBase
     {
         $this->imageHeight = $this->getConfig('imageHeight', 100);
         $this->imageWidth = $this->getConfig('imageWidth', 100);
-        $this->previewNoFilesMessage = $this->getConfig('previewNoFilesMessage', 'backend::lang.form.preview_no_files_message');
+        $this->previewNoFilesMessage = $this->getConfig(
+            'previewNoFilesMessage',
+            'backend::lang.form.preview_no_files_message'
+        );
+
         $this->checkUploadPostback();
     }
 
@@ -65,27 +72,56 @@ class FileUpload extends FormWidgetBase
 
     protected function getFileList()
     {
-        $columnName = $this->columnName;
-        $list = $this->model->$columnName()->withDeferred($this->sessionKey)->orderBy('sort_order')->get();
+        $list = $this->getRelationObject()->withDeferred($this->sessionKey)->orderBy('sort_order')->get();
 
-        // Set the thumb for each file
+        /*
+         * Set the thumb for each file
+         */
         foreach ($list as $file) {
             $file->thumb = $file->getThumb($this->imageWidth, $this->imageHeight, ['mode' => 'crop']);
         }
+
         return $list;
     }
 
+    /**
+     * Returns the display mode for the file upload. Eg: file-multi, image-single, etc.
+     * @return string
+     */
     protected function getDisplayMode()
     {
         $mode = $this->getConfig('mode', 'image');
 
-        if (str_contains($mode, '-'))
+        if (str_contains($mode, '-')) {
             return $mode;
+        }
 
-        $relationType = $this->model->getRelationType($this->columnName);
+        $relationType = $this->getRelationType();
         $mode .= ($relationType == 'attachMany' || $relationType == 'morphMany') ? '-multi' : '-single';
 
         return $mode;
+    }
+
+    /**
+     * Returns the value as a relation object from the model,
+     * supports nesting via HTML array.
+     * @return Relation
+     */
+    protected function getRelationObject()
+    {
+        list($model, $attribute) = $this->resolveModelAttribute($this->valueFrom);
+        return $model->{$attribute}();
+    }
+
+    /**
+     * Returns the value as a relation type from the model,
+     * supports nesting via HTML array.
+     * @return Relation
+     */
+    protected function getRelationType()
+    {
+        list($model, $attribute) = $this->resolveModelAttribute($this->valueFrom);
+        return $model->getRelationType($attribute);
     }
 
     /**
@@ -94,8 +130,7 @@ class FileUpload extends FormWidgetBase
     public function onRemoveAttachment()
     {
         if (($file_id = post('file_id')) && ($file = File::find($file_id))) {
-            $columnName = $this->columnName;
-            $this->model->$columnName()->remove($file, $this->sessionKey);
+            $this->getRelationObject()->remove($file, $this->sessionKey);
         }
     }
 
@@ -143,7 +178,7 @@ class FileUpload extends FormWidgetBase
 
             throw new SystemException('Unable to find file, it may no longer exist');
         }
-        catch (\Exception $ex) {
+        catch (Exception $ex) {
             return json_encode(['error' => $ex->getMessage()]);
         }
     }
@@ -158,13 +193,22 @@ class FileUpload extends FormWidgetBase
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public function getSaveValue($value)
+    {
+        return FormField::NO_SAVE_DATA;
+    }
+
+    /**
      * Checks the current request to see if it is a postback containing a file upload
      * for this particular widget.
      */
     protected function checkUploadPostback()
     {
-        if (!($uniqueId = post('X_OCTOBER_FILEUPLOAD')) || $uniqueId != $this->getId())
+        if (!($uniqueId = post('X_OCTOBER_FILEUPLOAD')) || $uniqueId != $this->getId()) {
             return;
+        }
 
         try {
             $uploadedFile = Input::file('file_data');
@@ -172,22 +216,24 @@ class FileUpload extends FormWidgetBase
             $isImage = starts_with($this->getDisplayMode(), 'image');
 
             $validationRules = ['max:'.File::getMaxFilesize()];
-            if ($isImage)
-                $validationRules[] = 'mimes:jpg,jpeg,bmp,png,gif';
+            if ($isImage) {
+                $validationRules[] = 'mimes:jpg,jpeg,bmp,png,gif,svg';
+            }
 
             $validation = Validator::make(
                 ['file_data' => $uploadedFile],
                 ['file_data' => $validationRules]
             );
 
-            if ($validation->fails())
+            if ($validation->fails()) {
                 throw new ValidationException($validation);
+            }
 
-            if (!$uploadedFile->isValid())
+            if (!$uploadedFile->isValid()) {
                 throw new SystemException('File is not valid');
+            }
 
-            $columnName = $this->columnName;
-            $fileRelation = $this->model->$columnName();
+            $fileRelation = $this->getRelationObject();
 
             $file = new File();
             $file->data = $uploadedFile;
@@ -200,10 +246,11 @@ class FileUpload extends FormWidgetBase
             $result = $file;
 
         }
-        catch (\Exception $ex) {
+        catch (Exception $ex) {
             $result = json_encode(['error' => $ex->getMessage()]);
         }
 
+        header('Content-Type: application/json');
         die($result);
     }
 }

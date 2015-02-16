@@ -13,6 +13,7 @@
         "Illuminate\\Foundation\\Providers\\OptimizeServiceProvider",
         "Illuminate\\Pagination\\PaginationServiceProvider",
         "Illuminate\\Queue\\QueueServiceProvider",
+        "Illuminate\\Redis\\RedisServiceProvider",
         "Illuminate\\Remote\\RemoteServiceProvider",
         "Illuminate\\Database\\SeedServiceProvider",
         "Illuminate\\Foundation\\Providers\\ServerServiceProvider",
@@ -29,6 +30,7 @@
         "October\\Rain\\Support\\Scaffold\\ScaffoldServiceProvider",
         "October\\Rain\\Support\\FlashServiceProvider",
         "October\\Rain\\Mail\\MailServiceProvider",
+        "Indatus\\Dispatcher\\ServiceProvider",
         "System\\ServiceProvider"
     ],
     "eager": [
@@ -53,6 +55,7 @@
         "cache.store": "Illuminate\\Cache\\CacheServiceProvider",
         "memcached.connector": "Illuminate\\Cache\\CacheServiceProvider",
         "command.cache.clear": "Illuminate\\Cache\\CacheServiceProvider",
+        "command.cache.table": "Illuminate\\Cache\\CacheServiceProvider",
         "command.session.database": "Illuminate\\Session\\CommandsServiceProvider",
         "command.command.make": "Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider",
         "composer": "Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider",
@@ -81,6 +84,7 @@
         "command.controller.make": "Illuminate\\Routing\\ControllerServiceProvider",
         "hash": "Illuminate\\Hashing\\HashServiceProvider",
         "log": "Illuminate\\Log\\LogServiceProvider",
+        "Psr\\Log\\LoggerInterface": "Illuminate\\Log\\LogServiceProvider",
         "migrator": "Illuminate\\Database\\MigrationServiceProvider",
         "migration.repository": "Illuminate\\Database\\MigrationServiceProvider",
         "command.migrate": "Illuminate\\Database\\MigrationServiceProvider",
@@ -99,6 +103,7 @@
         "command.queue.listen": "Illuminate\\Queue\\QueueServiceProvider",
         "command.queue.restart": "Illuminate\\Queue\\QueueServiceProvider",
         "command.queue.subscribe": "Illuminate\\Queue\\QueueServiceProvider",
+        "redis": "Illuminate\\Redis\\RedisServiceProvider",
         "remote": "Illuminate\\Remote\\RemoteServiceProvider",
         "seeder": "Illuminate\\Database\\SeedServiceProvider",
         "command.seed": "Illuminate\\Database\\SeedServiceProvider",
@@ -111,62 +116,31 @@
         "translation.loader": "October\\Rain\\Translation\\TranslationServiceProvider",
         "mailer": "October\\Rain\\Mail\\MailServiceProvider",
         "swift.mailer": "October\\Rain\\Mail\\MailServiceProvider",
-        "swift.transport": "October\\Rain\\Mail\\MailServiceProvider"
+        "swift.transport": "October\\Rain\\Mail\\MailServiceProvider",
+        "command.scheduled.summary": "Indatus\\Dispatcher\\ServiceProvider",
+        "command.scheduled.make": "Indatus\\Dispatcher\\ServiceProvider",
+        "command.scheduled.run": "Indatus\\Dispatcher\\ServiceProvider"
     },
     "when": {
-        "Illuminate\\Foundation\\Providers\\ArtisanServiceProvider": [
-
-        ],
-        "Illuminate\\Cache\\CacheServiceProvider": [
-
-        ],
-        "Illuminate\\Session\\CommandsServiceProvider": [
-
-        ],
-        "Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider": [
-
-        ],
-        "Illuminate\\Routing\\ControllerServiceProvider": [
-
-        ],
-        "Illuminate\\Hashing\\HashServiceProvider": [
-
-        ],
-        "Illuminate\\Log\\LogServiceProvider": [
-
-        ],
-        "Illuminate\\Database\\MigrationServiceProvider": [
-
-        ],
-        "Illuminate\\Foundation\\Providers\\OptimizeServiceProvider": [
-
-        ],
-        "Illuminate\\Pagination\\PaginationServiceProvider": [
-
-        ],
-        "Illuminate\\Queue\\QueueServiceProvider": [
-
-        ],
-        "Illuminate\\Remote\\RemoteServiceProvider": [
-
-        ],
-        "Illuminate\\Database\\SeedServiceProvider": [
-
-        ],
-        "Illuminate\\Foundation\\Providers\\ServerServiceProvider": [
-
-        ],
-        "Illuminate\\Validation\\ValidationServiceProvider": [
-
-        ],
-        "October\\Rain\\Html\\HtmlServiceProvider": [
-
-        ],
-        "October\\Rain\\Translation\\TranslationServiceProvider": [
-
-        ],
-        "October\\Rain\\Mail\\MailServiceProvider": [
-
-        ]
+        "Illuminate\\Foundation\\Providers\\ArtisanServiceProvider": [],
+        "Illuminate\\Cache\\CacheServiceProvider": [],
+        "Illuminate\\Session\\CommandsServiceProvider": [],
+        "Illuminate\\Foundation\\Providers\\ConsoleSupportServiceProvider": [],
+        "Illuminate\\Routing\\ControllerServiceProvider": [],
+        "Illuminate\\Hashing\\HashServiceProvider": [],
+        "Illuminate\\Log\\LogServiceProvider": [],
+        "Illuminate\\Database\\MigrationServiceProvider": [],
+        "Illuminate\\Foundation\\Providers\\OptimizeServiceProvider": [],
+        "Illuminate\\Pagination\\PaginationServiceProvider": [],
+        "Illuminate\\Queue\\QueueServiceProvider": [],
+        "Illuminate\\Redis\\RedisServiceProvider": [],
+        "Illuminate\\Remote\\RemoteServiceProvider": [],
+        "Illuminate\\Database\\SeedServiceProvider": [],
+        "Illuminate\\Foundation\\Providers\\ServerServiceProvider": [],
+        "Illuminate\\Validation\\ValidationServiceProvider": [],
+        "October\\Rain\\Html\\HtmlServiceProvider": [],
+        "October\\Rain\\Translation\\TranslationServiceProvider": [],
+        "October\\Rain\\Mail\\MailServiceProvider": [],
+        "Indatus\\Dispatcher\\ServiceProvider": []
     }
 }

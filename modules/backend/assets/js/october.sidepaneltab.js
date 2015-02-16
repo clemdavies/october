@@ -12,9 +12,13 @@
 
     SidePanelTab.prototype.init = function() {
         var self = this
-        this.$sideNavItems = $('#layout-sidenav ul li')
+        this.tabOpenDelay = 200
+        this.tabOpenTimeout = undefined
+        this.panelOpenTimeout = undefined
+        this.$sideNav = $('#layout-sidenav')
+        this.$sideNavItems = $('ul li', this.$sideNav)
         this.$sidePanelItems = $('[data-content-id]', this.$el)
-        this.sideNavWidth = $('#layout-sidenav ul li').outerWidth()
+        this.sideNavWidth = this.$sideNavItems.outerWidth()
         this.mainNavHeight = $('#layout-mainmenu').outerHeight()
         this.panelVisible = false
         this.visibleItemId = false
@@ -41,9 +45,16 @@
         })
 
         if (!Modernizr.touch) {
-            $('#layout-sidenav').mouseenter(function(){
-               if ($(window).width() < self.options.breakpoint || !self.panelFixed())
-                    self.displaySidePanel()
+            self.$sideNav.mouseenter(function(){
+               if ($(window).width() < self.options.breakpoint || !self.panelFixed()) {
+                    self.panelOpenTimeout = setTimeout(function () {
+                        self.displaySidePanel()
+                    }, self.tabOpenDelay)
+               }
+            })
+
+            self.$sideNav.mouseleave(function(){
+                clearTimeout(self.panelOpenTimeout)
             })
 
             self.$el.mouseleave(function(){
@@ -51,9 +62,18 @@
             })
 
             self.$sideNavItems.mouseenter(function(){
-                if ($(window).width() < self.options.breakpoint || !self.panelFixed())
-                    self.displayTab(this)
+                if ($(window).width() < self.options.breakpoint || !self.panelFixed()) {
+                    var _this = this
+                    self.tabOpenTimeout = setTimeout(function () {
+                        self.displayTab(_this)
+                    }, self.tabOpenDelay)
+                }
             })
+
+            self.$sideNavItems.mouseleave(function (){
+                clearTimeout(self.tabOpenTimeout)
+            })
+
 
             $(window).resize(function() {
                 self.updatePanelPosition()
@@ -115,7 +135,10 @@
     }
 
     SidePanelTab.prototype.updatePanelPosition = function() {
-        this.$el.height($(document).height() - this.mainNavHeight)
+        if (!this.panelFixed() || Modernizr.touch)
+            this.$el.height($(document).height() - this.mainNavHeight)
+        else 
+            this.$el.css('height', '')
 
         if (this.panelVisible && $(window).width() > this.options.breakpoint && this.panelFixed())
             this.hideSidePanel()

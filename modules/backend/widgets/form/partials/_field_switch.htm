@@ -1,11 +1,18 @@
 <!-- Switch -->
 <div class="field-switch">
-    <label><?= $field->label ?></label>
+    <label><?= e(trans($field->label)) ?></label>
     <?php if ($field->comment): ?>
         <p class="help-block"><?= e(trans($field->comment)) ?></p>
     <?php endif ?>
 </div>
-<label class="custom-switch" onclick="">
+
+<input
+    type="hidden"
+    name="<?= $field->getName() ?>"
+    value="0"
+    <?= $this->previewMode ? 'disabled="disabled"' : '' ?>>
+
+<label class="custom-switch">
     <input
         type="checkbox"
         id="<?= $field->getId() ?>"
@@ -13,7 +20,7 @@
         value="1"
         <?= $this->previewMode ? 'readonly="readonly"' : '' ?>
         <?= $field->value == 1 ? 'checked="checked"' : '' ?>
-        <?= HTML::attributes($field->attributes) ?>>
+        <?= $field->getAttributes() ?>>
     <span><span><?= e(trans('backend::lang.form.field_on')) ?></span><span><?= e(trans('backend::lang.form.field_off')) ?></span></span>
     <a class="slide-button"></a>
 </label>

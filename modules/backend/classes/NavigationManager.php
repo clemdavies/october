@@ -17,18 +17,20 @@ class NavigationManager
     /**
      * @var array Cache of registration callbacks.
      */
-    private $callbacks = [];
+    protected $callbacks = [];
 
     /**
      * @var array List of registered items.
      */
-    private $items;
+    protected $items;
 
-    private $contextOwner;
-    private $contextMainMenuItemCode;
-    private $contextSideMenuItemCode;
+    protected $contextSidenavPartials = [];
 
-    static $mainItemDefaults = [
+    protected $contextOwner;
+    protected $contextMainMenuItemCode;
+    protected $contextSideMenuItemCode;
+
+    protected static $mainItemDefaults = [
         'code'        => null,
         'label'       => null,
         'icon'        => null,
@@ -38,12 +40,13 @@ class NavigationManager
         'sideMenu'    => []
     ];
 
-    static $sideItemDefaults = [
+    protected static $sideItemDefaults = [
         'code'        => null,
         'label'       => null,
         'icon'        => null,
         'url'         => null,
         'counter'     => null,
+        'counterLabel'=> null,
         'attributes'  => [],
         'permissions' => []
     ];
@@ -81,8 +84,9 @@ class NavigationManager
 
         foreach ($plugins as $id => $plugin) {
             $items = $plugin->registerNavigation();
-            if (!is_array($items))
+            if (!is_array($items)) {
                 continue;
+            }
 
             $this->registerMenuItems($id, $items);
         }
@@ -95,9 +99,10 @@ class NavigationManager
         /*
          * Sort menu items
          */
-        usort($this->items, function($a, $b) {
-            if ($a->order == $b->order)
+        usort($this->items, function ($a, $b) {
+            if ($a->order == $b->order) {
                 return 0;
+            }
 
             return $a->order > $b->order ? 1 : -1;
         });
@@ -109,8 +114,9 @@ class NavigationManager
         $this->items = $this->filterItemPermissions($user, $this->items);
 
         foreach ($this->items as $item) {
-            if (!$item->sideMenu || !count($item->sideMenu))
+            if (!$item->sideMenu || !count($item->sideMenu)) {
                 continue;
+            }
 
             $item->sideMenu = $this->filterItemPermissions($user, $item->sideMenu);
         }
@@ -154,13 +160,15 @@ class NavigationManager
      * - permissions - an array of permissions the back-end user should have, optional.
      * - counter - an optional numeric value to output near the menu icon. The value should be
      *   a number or a callable returning a number.
+     * - counterLabel - an optional string value to describe the numeric reference in counter.
      * @param string $owner Specifies the menu items owner plugin or module in the format Author.Plugin.
      * @param array $definitions An array of the menu item definitions.
      */
     public function registerMenuItems($owner, array $definitions)
     {
-        if (!$this->items)
+        if (!$this->items) {
             $this->items = [];
+        }
 
         foreach ($definitions as $code => $definition) {
             $item = (object) array_merge(self::$mainItemDefaults, array_merge($definition, [
@@ -190,8 +198,9 @@ class NavigationManager
      */
     public function addMainMenuItems($owner, array $definitions)
     {
-        foreach ($definitions as $code => $definition)
+        foreach ($definitions as $code => $definition) {
             $this->addMainMenuItem($owner, $code, $definition);
+        }
     }
 
     /**
@@ -205,8 +214,9 @@ class NavigationManager
         $sideMenu = isset($definition['sideMenu']) ? $definition['sideMenu'] : null;
 
         $itemKey = $this->makeItemKey($owner, $code);
-        if (isset($this->items[$itemKey]))
+        if (isset($this->items[$itemKey])) {
             $definition = array_merge((array) $this->items[$itemKey], $definition);
+        }
 
         $item = (object) array_merge(self::$mainItemDefaults, array_merge($definition, [
             'code'  => $code,
@@ -215,8 +225,9 @@ class NavigationManager
 
         $this->items[$itemKey] = $item;
 
-        if ($sideMenu !== null)
+        if ($sideMenu !== null) {
             $this->addSideMenuItems($sideMenu);
+        }
     }
 
     /**
@@ -227,8 +238,9 @@ class NavigationManager
      */
     public function addSideMenuItems($owner, $code, array $definitions)
     {
-        foreach ($definitions as $sideCode => $definition)
+        foreach ($definitions as $sideCode => $definition) {
             $this->addSideMenuItem($owner, $code, $sideCode, $definition);
+        }
     }
 
     /**
@@ -241,12 +253,14 @@ class NavigationManager
     public function addSideMenuItem($owner, $code, $sideCode, array $definition)
     {
         $itemKey = $this->makeItemKey($owner, $code);
-        if (!isset($this->items[$itemKey]))
+        if (!isset($this->items[$itemKey])) {
             return false;
+        }
 
         $mainItem = $this->items[$itemKey];
-        if (isset($mainItem->sideMenu[$sideCode]))
+        if (isset($mainItem->sideMenu[$sideCode])) {
             $definition = array_merge((array) $mainItem->sideMenu[$sideCode], $definition);
+        }
 
         $item = (object) array_merge(self::$sideItemDefaults, $definition);
         $this->items[$itemKey]->sideMenu[$sideCode] = $item;
@@ -258,8 +272,9 @@ class NavigationManager
      */
     public function listMainMenuItems()
     {
-        if ($this->items === null)
+        if ($this->items === null) {
             $this->loadItems();
+        }
 
         return $this->items;
     }
@@ -279,14 +294,16 @@ class NavigationManager
             }
         }
 
-        if (!$activeItem)
+        if (!$activeItem) {
             return [];
+        }
 
         $items = $activeItem->sideMenu;
 
         foreach ($items as $item) {
-            if ($item->counter !== null && is_callable($item->counter))
+            if ($item->counter !== null && is_callable($item->counter)) {
                 $item->counter = call_user_func($item->counter, $item);
+            }
         }
 
         return $items;
@@ -295,9 +312,9 @@ class NavigationManager
     /**
      * Sets the navigation context.
      * The function sets the navigation owner, main menu item code and the side menu item code.
-     * @param string @owner Specifies the navigation owner in the format Vendor/Module
-     * @param string @mainMenuItemCode Specifies the main menu item code
-     * @param string @sideMenuItemCode Specifies the side menu item code
+     * @param string $owner Specifies the navigation owner in the format Vendor/Module
+     * @param string $mainMenuItemCode Specifies the main menu item code
+     * @param string $sideMenuItemCode Specifies the side menu item code
      */
     public function setContext($owner, $mainMenuItemCode, $sideMenuItemCode = null)
     {
@@ -309,7 +326,7 @@ class NavigationManager
     /**
      * Sets the navigation context.
      * The function sets the navigation owner.
-     * @param string @owner Specifies the navigation owner in the format Vendor/Module
+     * @param string $owner Specifies the navigation owner in the format Vendor/Module
      */
     public function setContextOwner($owner)
     {
@@ -318,7 +335,7 @@ class NavigationManager
 
     /**
      * Specifies a code of the main menu item in the current navigation context.
-     * @param string @mainMenuItemCode Specifies the main menu item code
+     * @param string $mainMenuItemCode Specifies the main menu item code
      */
     public function setContextMainMenu($mainMenuItemCode)
     {
@@ -330,18 +347,21 @@ class NavigationManager
      * @return mixed Returns an object with the following fields:
      * - mainMenuCode
      * - sideMenuCode
+     * - owner
      */
     public function getContext()
     {
         return (object)[
             'mainMenuCode' => $this->contextMainMenuItemCode,
-            'sideMenuCode' => $this->contextSideMenuItemCode
+            'sideMenuCode' => $this->contextSideMenuItemCode,
+            'owner' => $this->contextOwner
         ];
     }
 
     /**
      * Specifies a code of the side menu item in the current navigation context.
-     * @param string @sideMenuItemCode Specifies the side menu item code
+     * If the code is set to TRUE, the first item will be flagged as active.
+     * @param string $sideMenuItemCode Specifies the side menu item code
      */
     public function setContextSideMenu($sideMenuItemCode)
     {
@@ -350,7 +370,7 @@ class NavigationManager
 
     /**
      * Determines if a main menu item is active.
-     * @param mixed @item Specifies the item object.
+     * @param mixed $item Specifies the item object.
      * @return boolean Returns true if the menu item is active.
      */
     public function isMainMenuItemActive($item)
@@ -359,13 +379,62 @@ class NavigationManager
     }
 
     /**
+     * Returns the currently active main menu item
+     * @param mixed $item Returns the item object or null.
+     */
+    public function getActiveMainMenuItem()
+    {
+        foreach ($this->listMainMenuItems() as $item) {
+            if ($this->isMainMenuItemActive($item)) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Determines if a side menu item is active.
-     * @param mixed @item Specifies the item object.
+     * @param mixed $item Specifies the item object.
      * @return boolean Returns true if the side item is active.
      */
     public function isSideMenuItemActive($item)
     {
+        if ($this->contextSideMenuItemCode === true) {
+            $this->contextSideMenuItemCode = null;
+            return true;
+        }
+
         return $this->contextOwner == $item->owner && $this->contextSideMenuItemCode == $item->code;
+    }
+
+    /**
+     * Registers a special side navigation partial for a specific main menu.
+     * The sidenav partial replaces the standard side navigation.
+     * @param string $owner Specifies the navigation owner in the format Vendor/Module.
+     * @param string $mainMenuItemCode Specifies the main menu item code.
+     * @param string $partial Specifies the partial name.
+     */
+    public function registerContextSidenavPartial($owner, $mainMenuItemCode, $partial)
+    {
+        $this->contextSidenavPartials[$owner.$mainMenuItemCode] = $partial;
+    }
+
+    /**
+     * Returns the side navigation partial for a specific main menu previously registered
+     * with the registerContextSidenavPartial() method.
+     *
+     * @param string $owner Specifies the navigation owner in the format Vendor/Module.
+     * @param string $mainMenuItemCode Specifies the main menu item code.
+     * @return mixed Returns the partial name or null.
+     */
+    public function getContextSidenavPartial($owner, $mainMenuItemCode)
+    {
+        $key = $owner.$mainMenuItemCode;
+
+        return array_key_exists($key, $this->contextSidenavPartials)
+            ? $this->contextSidenavPartials[$key]
+            : null;
     }
 
     /**
@@ -374,11 +443,12 @@ class NavigationManager
      * @param array $items A collection of menu items
      * @return array The filtered menu items
      */
-    private function filterItemPermissions($user, array $items)
+    protected function filterItemPermissions($user, array $items)
     {
-        $items = array_filter($items, function($item) use ($user) {
-            if (!$item->permissions || !count($item->permissions))
+        $items = array_filter($items, function ($item) use ($user) {
+            if (!$item->permissions || !count($item->permissions)) {
                 return true;
+            }
 
             return $user->hasAnyAccess($item->permissions);
         });
@@ -391,7 +461,7 @@ class NavigationManager
      * @param  object $item
      * @return string
      */
-    private function makeItemKey($owner, $code)
+    protected function makeItemKey($owner, $code)
     {
         return strtoupper($owner).'.'.strtoupper($code);
     }

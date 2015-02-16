@@ -56,9 +56,12 @@ class __TwigTemplate_1614aeda26f472ef5f0c7cfc7e729bb91dc5f77b4b36930046123878478
         echo "\"></script>
         ";
         // line 29
-        echo '<script src="'. Request::getBasePath() .'/modules/system/assets/js/framework.js"></script>'.PHP_EOL;
-        echo '<script src="'. Request::getBasePath() .'/modules/system/assets/js/framework.extras.js"></script>'.PHP_EOL;
-        echo '<link href="'. Request::getBasePath() .'/modules/system/assets/css/framework.extras.css" rel="stylesheet">'.PHP_EOL;
+        echo '<script src="'. Request::getBasePath()
+                .'/modules/system/assets/js/framework.js"></script>'.PHP_EOL;
+        echo '<script src="'. Request::getBasePath()
+                    .'/modules/system/assets/js/framework.extras.js"></script>'.PHP_EOL;
+        echo '<link href="'. Request::getBasePath()
+                    .'/modules/system/assets/css/framework.extras.css" rel="stylesheet">'.PHP_EOL;
         // line 30
         echo "        ";
         echo $this->env->getExtension('CMS')->assetsFunction('js');
@@ -80,6 +83,6 @@ class __TwigTemplate_1614aeda26f472ef5f0c7cfc7e729bb91dc5f77b4b36930046123878478
 
     public function getDebugInfo()
     {
-        return array (  67 => 31,  63 => 30,  59 => 29,  56 => 28,  54 => 25,  45 => 18,  43 => 17,  29 => 7,  26 => 6,  19 => 1,);
+        return array (  70 => 31,  66 => 30,  59 => 29,  56 => 28,  54 => 25,  45 => 18,  43 => 17,  29 => 7,  26 => 6,  19 => 1,);
     }
 }

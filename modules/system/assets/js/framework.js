@@ -20,10 +20,10 @@ if (window.jQuery === undefined)
          */
 
         if (handler == undefined)
-            throw new Error('The request handler name is not specified.');
+            throw new Error('The request handler name is not specified.')
 
         if (!handler.match(/^(?:\w+\:{2})?on*/))
-            throw new Error('Invalid handler name. The correct handler name format is: "onEvent".');
+            throw new Error('Invalid handler name. The correct handler name format is: "onEvent".')
 
         /*
          * Detect if page is refreshed to stop any active ajax errors
@@ -33,10 +33,30 @@ if (window.jQuery === undefined)
         $(window).on('beforeunload', function() { isUnloading = true })
 
         /*
+         * Custom function, requests confirmation from the user
+         */
+
+        function handleConfirmMessage(message) {
+            var _event = jQuery.Event('ajaxConfirmMessage')
+
+            _event.promise = $.Deferred()
+            if ($(window).triggerHandler(_event, [message]) !== undefined) {
+                _event.promise.done(function(){
+                    options.confirm = null
+                    new Request(element, handler, options)
+                })
+                return false
+            }
+
+            if (_event.isDefaultPrevented()) return
+            if (message) return confirm(message)
+        }
+
+        /*
          * Initiate request
          */
 
-        if (options.confirm !== undefined && options.confirm.length && !confirm(options.confirm))
+        if (options.confirm && !handleConfirmMessage(options.confirm))
             return
 
         var
@@ -55,8 +75,14 @@ if (window.jQuery === undefined)
             data.push($.param(paramToObj('data-request-data', $(this).data('request-data'))))
         })
 
+        if ($el.is(':input') && !form.length) {
+            var inputName = $el.attr('name')
+            if (options.data[inputName] === undefined)
+                options.data[inputName] = $el.val()
+        }
+
         if (options.data !== undefined && !$.isEmptyObject(options.data))
-            data.push($.param(options.data));
+            data.push($.param(options.data))
 
         var requestOptions = {
             context: context,
@@ -96,6 +122,12 @@ if (window.jQuery === undefined)
 
                 if (isUnloading)
                     return
+
+                /*
+                 * Disable redirects
+                 */
+                isRedirect = false
+                options.redirect = null
 
                 /*
                  * Error 406 is a "smart error" that returns response object that is
@@ -194,12 +226,18 @@ if (window.jQuery === undefined)
                  * Focus fields with errors
                  */
                 if (data['X_OCTOBER_ERROR_FIELDS']) {
-                    $.each(Object.keys(data['X_OCTOBER_ERROR_FIELDS']), function(index, fieldName){
-                        var fieldElement = form.find('[name="'+fieldName+'"], [name$="['+fieldName+']"]').filter(':enabled').first()
+                    var isFirstInvalidField = true
+                    $.each(data['X_OCTOBER_ERROR_FIELDS'], function(fieldName, fieldMessages){
+                        var fieldElement = form.find('[name="'+fieldName+'"], [name="'+fieldName+'[]"], [name$="['+fieldName+']"], [name$="['+fieldName+'][]"]').filter(':enabled').first()
                         if (fieldElement.length > 0) {
-                            fieldElement.focus()
-                            $(window).trigger('ajaxInvalidField', [fieldElement, fieldName])
-                            return false // Break loop
+
+                            var _event = jQuery.Event('ajaxInvalidField')
+                            $(window).trigger(_event, [fieldElement, fieldName, fieldMessages, isFirstInvalidField])
+
+                            if (isFirstInvalidField) {
+                                if (!_event.isDefaultPrevented()) fieldElement.focus()
+                                isFirstInvalidField = false
+                            }
                         }
                     })
                 }
@@ -230,17 +268,23 @@ if (window.jQuery === undefined)
 
         if (loading) loading.show()
 
-        $el.trigger('ajaxPromise')
+        $(window).trigger('ajaxBeforeSend', [context])
+        $el.trigger('ajaxPromise', [context])
         return $.ajax(requestOptions)
             .fail(function(jqXHR, textStatus, errorThrown){
-                if (!isRedirect) $el.trigger('ajaxFail', [context, textStatus, jqXHR])
+                if (!isRedirect) {
+                    $el.trigger('ajaxFail', [context, textStatus, jqXHR])
+                    if (loading) loading.hide()
+                }
             })
             .done(function(data, textStatus, jqXHR){
-                if (!isRedirect) $el.trigger('ajaxDone', [context, data, textStatus, jqXHR])
+                if (!isRedirect) {
+                    $el.trigger('ajaxDone', [context, data, textStatus, jqXHR])
+                    if (loading) loading.hide()
+                }
             })
             .always(function(dataOrXhr, textStatus, xhrOrError){
                 $el.trigger('ajaxAlways', [context, dataOrXhr, textStatus, xhrOrError])
-                if (loading) loading.hide()
             })
     }
 
@@ -257,12 +301,12 @@ if (window.jQuery === undefined)
      * Internal function, build a string of partials and their update elements.
      */
     Request.prototype.extractPartials = function(update) {
-        var result = [];
+        var result = []
 
         for (var partial in update)
             result.push(partial)
 
-        return result.join('&');
+        return result.join('&')
     }
 
     // REQUEST PLUGIN DEFINITION
@@ -312,34 +356,35 @@ if (window.jQuery === undefined)
 
         try {
             return JSON.parse(JSON.stringify(eval("({" + value + "})")))
-        } catch (e) {
+        }
+        catch (e) {
             throw new Error('Error parsing the '+name+' attribute value. '+e)
         }
     }
 
     $(document).on('change', 'select[data-request], input[type=radio][data-request], input[type=checkbox][data-request]', function(){
-        $(this).request();
-    });
+        $(this).request()
+    })
 
     $(document).on('click', 'a[data-request], button[data-request], input[type=button][data-request], input[type=submit][data-request]', function(){
-        $(this).request();
-        return false;
-    });
+        $(this).request()
+        return false
+    })
 
     $(document).on('keydown', 'input[type=text][data-request], input[type=submit][data-request], input[type=password][data-request]', function(e){
         if (e.keyCode == 13) {
             if (this.dataTrackInputTimer !== undefined)
-                window.clearTimeout(this.dataTrackInputTimer);
+                window.clearTimeout(this.dataTrackInputTimer)
 
-            $(this).request();
-            return false;
+            $(this).request()
+            return false
         }
-    });
+    })
 
     $(document).on('keyup', 'input[type=text][data-request][data-track-input], input[type=password][data-request][data-track-input]', function(e){
-        var 
+        var
             $el = $(this),
-            lastValue = $el.data('oc.lastvalue');
+            lastValue = $el.data('oc.lastvalue')
 
         if (lastValue !== undefined && lastValue == this.value)
             return
@@ -347,22 +392,22 @@ if (window.jQuery === undefined)
         $el.data('oc.lastvalue', this.value)
 
         if (this.dataTrackInputTimer !== undefined)
-            window.clearTimeout(this.dataTrackInputTimer);
+            window.clearTimeout(this.dataTrackInputTimer)
 
         var interval = $(this).data('track-input')
         if (!interval)
-            interval = 300;
+            interval = 300
 
-        var self = this;
+        var self = this
         this.dataTrackInputTimer = window.setTimeout(function(){
-            $(self).request();
-        }, interval);
-    });
+            $(self).request()
+        }, interval)
+    })
 
     $(document).on('submit', '[data-request]', function(){
-        $(this).request();
-        return false;
-    });
+        $(this).request()
+        return false
+    })
 
     /*
      * Invent our own event that unifies document.ready with window.ajaxUpdateComplete

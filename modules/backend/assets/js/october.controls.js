@@ -46,14 +46,22 @@
             return state.text
         }
 
-        $('select.custom-select').select2({
+        $('select.custom-select:not([data-no-auto-update-on-render=true])').select2({
+            // The data-no-auto-update-on-render attribute allows to disable the 
+            // selec2 automatic initialization for edge cases.
+
             formatResult: formatSelectOption,
             formatSelection: formatSelectOption,
             escapeMarkup: function(m) { return m; }
         })
-
-        $(document).on('disable', 'select.custom-select', function(event, status){
-            $(this).select2('enable', !status)
-        })
     })
+
+    $(document).on('disable', 'select.custom-select', function(event, status){
+        $(this).select2('enable', !status)
+    })
+
+    $(document).on('focus', 'select.custom-select', function(event){
+        setTimeout($.proxy(function() { $(this).select2('focus') }, this), 10)
+    })
+
 })(jQuery);

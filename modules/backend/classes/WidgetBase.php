@@ -13,10 +13,9 @@ use Session;
  */
 abstract class WidgetBase
 {
-
     use \System\Traits\AssetMaker;
     use \System\Traits\ConfigMaker;
-    use \Backend\Traits\ViewMaker;
+    use \System\Traits\ViewMaker;
     use \Backend\Traits\WidgetMaker;
     use \October\Rain\Support\Traits\Emitter;
 
@@ -52,7 +51,10 @@ abstract class WidgetBase
 
         // Option A: (@todo Determine which is faster by benchmark)
         // $relativePath = strtolower(str_replace('\\', '/', get_called_class()));
-        // $this->viewPath = $this->configPath = ['modules/' . $relativePath . '/partials', 'plugins/' . $relativePath . '/partials'];
+        // $this->viewPath = $this->configPath = [
+        //     'modules/' . $relativePath . '/partials',
+        //     'plugins/' . $relativePath . '/partials'
+        // ];
         // $this->assetPath = ['modules/' . $relativePath . '/assets', 'plugins/' . $relativePath . '/assets'];
 
         // Option B:
@@ -62,16 +64,18 @@ abstract class WidgetBase
         /*
          * Apply configuration values to a new config object.
          */
-        if (!$configuration)
+        if (!$configuration) {
             $configuration = [];
+        }
 
         $this->config = $this->makeConfig($configuration);
 
         /*
          * If no alias is set by the configuration.
          */
-        if (!isset($this->alias))
+        if (!isset($this->alias)) {
             $this->alias = (isset($this->config->alias)) ? $this->config->alias : $this->defaultAlias;
+        }
 
         /*
          * Prepare assets used by this widget.
@@ -81,28 +85,35 @@ abstract class WidgetBase
         /*
          * Initialize the widget.
          */
-        if (!$this->getConfig('noInit', false))
+        if (!$this->getConfig('noInit', false)) {
             $this->init();
+        }
     }
 
     /**
      * Initialize the widget, called by the constructor and free from its parameters.
      * @return void
      */
-    public function init(){}
+    public function init()
+    {
+    }
 
     /**
      * Renders the widgets primary contents.
      * @return string HTML markup supplied by this widget.
      */
-    public function render(){}
+    public function render()
+    {
+    }
 
     /**
      * Adds widget specific asset files. Use $this->addJs() and $this->addCss()
      * to register new assets to include on the page.
      * @return void
      */
-    protected function loadAssets(){}
+    protected function loadAssets()
+    {
+    }
 
     /**
      * Binds a widget to the controller for safe use.
@@ -110,8 +121,9 @@ abstract class WidgetBase
      */
     public function bindToController()
     {
-        if ($this->controller->widget === null)
+        if ($this->controller->widget === null) {
             $this->controller->widget = new \stdClass();
+        }
 
         $this->controller->widget->{$this->alias} = $this;
     }
@@ -123,15 +135,17 @@ abstract class WidgetBase
      */
     public function getId($suffix = null)
     {
-        $id = Str::getRealClass(get_called_class());
+        $id = class_basename(get_called_class());
 
-        if ($this->alias != $this->defaultAlias)
+        if ($this->alias != $this->defaultAlias) {
             $id .= '-' . $this->alias;
+        }
 
-        if ($suffix !== null)
+        if ($suffix !== null) {
             $id .= '-' . $suffix;
+        }
 
-        return $id;
+        return Str::evalHtmlId($id);
     }
 
     /**
@@ -161,8 +175,9 @@ abstract class WidgetBase
          * First part will be the field name, pop it off
          */
         $fieldName = array_shift($keyParts);
-        if (!isset($this->config->{$fieldName}))
+        if (!isset($this->config->{$fieldName})) {
             return $default;
+        }
 
         $result = $this->config->{$fieldName};
 
@@ -170,8 +185,9 @@ abstract class WidgetBase
          * Loop the remaining key parts and build a result
          */
         foreach ($keyParts as $key) {
-            if (!array_key_exists($key, $result))
+            if (!array_key_exists($key, $result)) {
                 return $default;
+            }
 
             $result = $result[$key];
         }
@@ -218,11 +234,13 @@ abstract class WidgetBase
         $sessionId = $this->makeSessionId();
 
         $currentStore = [];
-        if (Session::has($sessionId))
+        if (Session::has($sessionId)) {
             $currentStore = unserialize(Session::get($sessionId));
+        }
 
-        if ($key === null)
+        if ($key === null) {
             return $currentStore;
+        }
 
         return isset($currentStore[$key]) ? $currentStore[$key] : $default;
     }
@@ -235,7 +253,9 @@ abstract class WidgetBase
     {
         // Removes Class name and "Controllers" directory
         $rootNamespace = Str::getClassId(Str::getClassNamespace(Str::getClassNamespace($this->controller)));
-        return 'widget.' . $rootNamespace . '-' . $this->controller->getId() . '-' . $this->getId();
+
+        // The controller action is intentionally omitted, session should be shared for all actions
+        return 'widget.' . $rootNamespace . '-' . class_basename($this->controller) . '-' . $this->getId();
     }
 
     /**
@@ -247,5 +267,4 @@ abstract class WidgetBase
         $sessionId = $this->makeSessionId();
         Session::forget($sessionId);
     }
-
 }

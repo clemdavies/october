@@ -26,7 +26,7 @@
         this.$toolbar  = this.$el.find('>.editor-toolbar:first')
         this.$code     = null
         this.editor    = null
-        
+
         // Toolbar links
         this.isFullscreen = false
         this.$fullscreenEnable = this.$toolbar.find('li.fullscreen-enable')
@@ -221,6 +221,10 @@
         return this.editor
     }
 
+    CodeEditor.prototype.getToolbar = function() {
+        return this.$toolbar
+    }
+
     CodeEditor.prototype.toggleFullscreen = function() {
         this.$el.toggleClass('editor-fullscreen')
         this.$fullscreenEnable.toggle()
@@ -262,6 +266,21 @@
     }
 
     $.fn.codeEditor.Constructor = CodeEditor
+
+    if ($.oc === undefined)
+        $.oc = {}
+
+    $.oc.codeEditorExtensionModes = {
+        'htm': 'html',
+        'html': 'html',
+        'md': 'markdown',
+        'txt': 'plain_text',
+        'js': 'javascript',
+        'less': 'less',
+        'scss': 'scss',
+        'sass': 'sass',
+        'css': 'css'
+    }
 
     // CODEEDITOR NO CONFLICT
     // =================

@@ -3,6 +3,12 @@
 use App;
 use Model;
 
+/**
+ * Mail settings
+ *
+ * @package october\system
+ * @author Alexey Bobkov, Samuel Georges
+ */
 class MailSettings extends Model
 {
     public $implement = ['System.Behaviors.SettingsModel'];
@@ -10,16 +16,19 @@ class MailSettings extends Model
     public $settingsCode = 'system_mail_settings';
     public $settingsFields = 'fields.yaml';
 
+    const MODE_LOG      = 'log';
     const MODE_MAIL     = 'mail';
     const MODE_SENDMAIL = 'sendmail';
     const MODE_SMTP     = 'smtp';
+    const MODE_MAILGUN  = 'mailgun';
+    const MODE_MANDRILL = 'mandrill';
 
     public function initSettingsData()
     {
         $config = App::make('config');
         $this->send_mode = $config->get('mail.driver', static::MODE_MAIL);
         $this->sender_name = $config->get('mail.from.name', 'Your Site');
-        $this->sender_email = $config->get('mail.from.address', 'admin@admin.admin');
+        $this->sender_email = $config->get('mail.from.address', 'admin@domain.tld');
         $this->sendmail_path = $config->get('mail.sendmail', '/usr/sbin/sendmail');
         $this->smtp_address = $config->get('mail.host');
         $this->smtp_port = $config->get('mail.port', 587);
@@ -31,9 +40,12 @@ class MailSettings extends Model
     public function getSendModeOptions()
     {
         return [
-            static::MODE_MAIL     => 'PHP mail',
-            static::MODE_SENDMAIL => 'Sendmail',
-            static::MODE_SMTP     => 'SMTP',
+            static::MODE_LOG      => 'system::lang.mail.log_file',
+            static::MODE_MAIL     => 'system::lang.mail.php_mail',
+            static::MODE_SENDMAIL => 'system::lang.mail.sendmail',
+            static::MODE_SMTP     => 'system::lang.mail.smtp',
+            static::MODE_MAILGUN  => 'system::lang.mail.mailgun',
+            static::MODE_MANDRILL => 'system::lang.mail.mandrill',
         ];
     }
 
@@ -63,6 +75,16 @@ class MailSettings extends Model
             case self::MODE_SENDMAIL:
                 $config->set('mail.sendmail', $settings->sendmail_path);
                 break;
+
+            case self::MODE_MAILGUN:
+                $config->set('services.mailgun.domain', $settings->mailgun_domain);
+                $config->set('services.mailgun.secret', $settings->mailgun_secret);
+                break;
+
+            case self::MODE_MANDRILL:
+                $config->set('services.mandrill.secret', $settings->mandrill_secret);
+                break;
         }
+
     }
 }

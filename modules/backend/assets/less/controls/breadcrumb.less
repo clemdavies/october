@@ -5,8 +5,8 @@
     margin: -20px -20px 20px -20px;
     background-color: @color-breadcrumb-background;
 
-    ul { 
-        padding: 0; 
+    ul {
+        padding: 0;
         margin: 0;
     }
 
@@ -40,13 +40,27 @@
         }
     }
 
-    + .content-tabs {
+    + .content-tabs, + .padded-container {
         margin-top: -20px;
+    }
+
+    // Breadcrumb to sit flush to the element below
+    &.no-bottom-margin, // @deprecated remove if year >= 2015
+    &.breadcrumb-flush {
+        margin-bottom: 0;
     }
 }
 
 body.slim-container {
     .control-breadcrumb {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+body.compact-container {
+    .control-breadcrumb {
+        margin-top: 0;
         margin-left: 0;
         margin-right: 0;
     }

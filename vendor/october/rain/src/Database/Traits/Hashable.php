@@ -14,7 +14,7 @@ trait Hashable
     /**
      * @var array List of original attribute values before they were hashed.
      */
-    private $originalHashableValues = [];
+    protected $originalHashableValues = [];
 
     /**
      * Boot the hashable trait for a model.
@@ -35,6 +35,17 @@ trait Hashable
                     return $model->makeHashValue($key, $value);
             });
         });
+    }
+
+    /**
+     * Adds an attribute to the hashable attributes list
+     * @param string $attribute Attribute
+     * @return this
+     */
+    public function addHashableAttribute($attribute)
+    {
+        $this->hashable[] = $attribute;
+        return $this;
     }
 
     /**

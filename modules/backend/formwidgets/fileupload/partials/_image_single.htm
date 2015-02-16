@@ -2,7 +2,6 @@
     id="<?= $this->getId() ?>"
     class="field-fileupload <?= $singleFile ? 'has-attachments' : '' ?>"
     data-control="fileupload"
-    data-upload-input="#<?= $this->getId('uploadInput') ?>"
     data-unique-id="<?= $this->getId() ?>"
     data-image-width="<?= $imageWidth ?>"
     data-image-height="<?= $imageHeight ?>"
@@ -27,13 +26,6 @@
         <div class="uploader-loading"></div>
     </div>
 
-    <!-- Upload form -->
-    <input
-        id="<?= $this->getId('uploadInput') ?>"
-        type="file"
-        name="file_data"
-        class="attachment-input" />
-
     <!-- Populated Image -->
     <script type="text/template" id="<?= $this->getId('template') ?>">
 
@@ -49,23 +41,27 @@
             {{#description}}
                 <p><abbr title="{{description}}">{{description}}</abbr></p>
             {{/description}}
-            <a
-                href="javascript:;"
-                class="uploader-remove oc-icon-times"
-                data-request="<?= $this->getEventHandler('onRemoveAttachment') ?>"
-                data-request-data="file_id: {{id}}"></a>
 
-            <div class="controls">
+            <?php if (!$this->previewMode): ?>
                 <a
                     href="javascript:;"
-                    class="uploader-config oc-icon-cog"
-                    data-control="popup"
-                    data-handler="<?= $this->getEventHandler('onLoadAttachmentConfig') ?>"
+                    class="uploader-remove oc-icon-times"
+                    data-request="<?= $this->getEventHandler('onRemoveAttachment') ?>"
                     data-request-data="file_id: {{id}}"></a>
+            <?php endif ?>
 
+            <div class="controls">
+                <?php if (!$this->previewMode): ?>
+                    <a
+                        href="javascript:;"
+                        class="uploader-config oc-icon-cog"
+                        data-control="popup"
+                        data-handler="<?= $this->getEventHandler('onLoadAttachmentConfig') ?>"
+                        data-request-data="file_id: {{id}}"></a>
+                <?php endif ?>
                 <a
                     href="{{path}}"
-                    class="uploader-file-link oc-icon-paper-clip"
+                    class="uploader-file-link oc-icon-paperclip"
                     target="_blank"></a>
             </div>
         </div>

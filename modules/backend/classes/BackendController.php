@@ -43,11 +43,12 @@ class BackendController extends ControllerBase
          */
         $module = isset($params[0]) ? $params[0] : 'backend';
         $controller = isset($params[1]) ? $params[1] : 'index';
-        self::$action = $action = isset($params[2]) ? $params[2] : 'index';
+        self::$action = $action = isset($params[2]) ? $this->parseAction($params[2]) : 'index';
         self::$params = $controllerParams = array_slice($params, 3);
         $controllerClass = '\\'.$module.'\Controllers\\'.$controller;
-        if ($controllerObj = $this->findController($controllerClass, $action, '/modules'))
+        if ($controllerObj = $this->findController($controllerClass, $action, '/modules')) {
             return $controllerObj->run($action, $controllerParams);
+        }
 
         /*
          * Look for a Plugin controller
@@ -55,13 +56,18 @@ class BackendController extends ControllerBase
         if (count($params) >= 2) {
             list($author, $plugin) = $params;
             $controller = isset($params[2]) ? $params[2] : 'index';
-            self::$action = $action = isset($params[3]) ? $params[3] : 'index';
+            self::$action = $action = isset($params[3]) ? $this->parseAction($params[3]) : 'index';
             self::$params = $controllerParams = array_slice($params, 4);
             $controllerClass = '\\'.$author.'\\'.$plugin.'\Controllers\\'.$controller;
-            if ($controllerObj = $this->findController($controllerClass, $action, Config::get('cms.pluginsDir', '/plugins')))
+            if ($controllerObj = $this->findController(
+                $controllerClass,
+                $action,
+                Config::get('cms.pluginsDir', '/plugins')
+            )) {
                 return $controllerObj->run($action, $controllerParams);
+            }
         }
-        
+
         /*
          * Fall back on Cms controller
          */
@@ -75,7 +81,7 @@ class BackendController extends ControllerBase
      * @param string $action Specifies a method name to execute.
      * @return ControllerBase Returns the backend controller object
      */
-    private function findController($controller, $action, $dirPrefix = null)
+    protected function findController($controller, $action, $dirPrefix = null)
     {
         /*
          * Workaround: Composer does not support case insensitivity.
@@ -83,18 +89,35 @@ class BackendController extends ControllerBase
         if (!class_exists($controller)) {
             $controller = Str::normalizeClassName($controller);
             $controllerFile = PATH_BASE.$dirPrefix.strtolower(str_replace('\\', '/', $controller)) . '.php';
-            if ($controllerFile = File::existsInsensitive($controllerFile))
+            if ($controllerFile = File::existsInsensitive($controllerFile)) {
                 include_once($controllerFile);
+            }
         }
 
-        if (!class_exists($controller))
+        if (!class_exists($controller)) {
             return false;
+        }
 
         $controllerObj = App::make($controller);
 
-        if ($controllerObj->actionExists($action))
+        if ($controllerObj->actionExists($action)) {
             return $controllerObj;
+        }
 
         return false;
+    }
+
+    /**
+     * Process the action name, since dashes are not supported in PHP methods.
+     * @param  string $actionName
+     * @return string
+     */
+    protected function parseAction($actionName)
+    {
+        if (strpos($actionName, '-') !== false) {
+            return camel_case($actionName);
+        }
+
+        return $actionName;
     }
 }

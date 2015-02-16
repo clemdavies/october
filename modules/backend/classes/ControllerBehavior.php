@@ -4,7 +4,7 @@ use Str;
 use Lang;
 use System\Classes\ApplicationException;
 use October\Rain\Extension\ExtensionBase;
-use Backend\Traits\ViewMaker;
+use System\Traits\ViewMaker;
 
 /**
  * Controller Behavior base class
@@ -14,10 +14,10 @@ use Backend\Traits\ViewMaker;
  */
 class ControllerBehavior extends ExtensionBase
 {
+    use \Backend\Traits\WidgetMaker;
     use \System\Traits\AssetMaker;
     use \System\Traits\ConfigMaker;
-    use \Backend\Traits\WidgetMaker;
-    use \Backend\Traits\ViewMaker {
+    use \System\Traits\ViewMaker {
         ViewMaker::makeFileContents as localMakeFileContents;
     }
 
@@ -45,7 +45,10 @@ class ControllerBehavior extends ExtensionBase
 
         // Option A: (@todo Determine which is faster by benchmark)
         // $relativePath = strtolower(str_replace('\\', '/', get_called_class()));
-        // $this->viewPath = $this->configPath = ['modules/' . $relativePath . '/partials', 'plugins/' . $relativePath . '/partials'];
+        // $this->viewPath = $this->configPath = [
+        //     'modules/' . $relativePath . '/partials',
+        //     'plugins/' . $relativePath . '/partials'
+        // ];
         // $this->assetPath = ['modules/' . $relativePath . '/assets', 'plugins/' . $relativePath . '/assets'];
 
         // Option B:
@@ -93,8 +96,9 @@ class ControllerBehavior extends ExtensionBase
          * First part will be the field name, pop it off
          */
         $fieldName = array_shift($keyParts);
-        if (!isset($this->config->{$fieldName}))
+        if (!isset($this->config->{$fieldName})) {
             return $default;
+        }
 
         $result = $this->config->{$fieldName};
 
@@ -102,8 +106,9 @@ class ControllerBehavior extends ExtensionBase
          * Loop the remaining key parts and build a result
          */
         foreach ($keyParts as $key) {
-            if (!array_key_exists($key, $result))
+            if (!array_key_exists($key, $result)) {
                 return $default;
+            }
 
             $result = $result[$key];
         }
@@ -121,8 +126,9 @@ class ControllerBehavior extends ExtensionBase
      */
     protected function hideAction($methodName)
     {
-        if (!is_array($methodName))
+        if (!is_array($methodName)) {
             $methodName = [$methodName];
+        }
 
         $this->controller->hiddenActions = array_merge($this->controller->hiddenActions, $methodName);
     }
