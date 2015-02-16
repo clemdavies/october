@@ -1,7 +1,0 @@
-/* library.less */
-.head {
-  background: green;
-}
-.head .heading {
-  color: white;
-}

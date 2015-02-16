@@ -27,7 +27,7 @@ abstract class ComponentBase extends Core
         $directory = implode('/', $dirArray );
 
         $cssPath = Request::getBaseUrl();
-        $cssPath .= CombineAssets::combine(array($filename),$directory);// this line throws exception
+        $cssPath .= CombineAssets::combine(array($filename),$directory);
 
 
         if (isset($this->controller))
